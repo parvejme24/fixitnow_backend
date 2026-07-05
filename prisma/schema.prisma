@@ -11,3 +11,212 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+
+// ─────────────────────────── ENUMS ───────────────────────────
+
+enum Role {
+  CUSTOMER
+  TECHNICIAN
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED
+}
+
+enum BookingStatus {
+  REQUESTED // customer created booking
+  ACCEPTED // technician accepted → payment unlocked
+  DECLINED // technician declined
+  PAID // payment completed via SSLCommerz/Stripe
+  IN_PROGRESS // technician started the job
+  COMPLETED // job done → review unlocked
+  CANCELLED // customer cancelled (before IN_PROGRESS)
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum PaymentProvider {
+  SSLCOMMERZ
+  STRIPE
+}
+
+enum DayOfWeek {
+  SATURDAY
+  SUNDAY
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+}
+
+// ─────────────────────────── MODELS ───────────────────────────
+
+// 1️⃣ Users — auth info + role (all 3 roles live here)
+model User {
+  id        String     @id @default(cuid())
+  name      String
+  email     String     @unique
+  password  String // bcrypt hashed
+  phone     String?
+  role      Role       @default(CUSTOMER)
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Relations
+  technicianProfile TechnicianProfile? // only if role = TECHNICIAN
+  bookings          Booking[]          @relation("CustomerBookings")
+  reviews           Review[]
+
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+// 2️⃣ TechnicianProfiles — technician-specific info (1-1 with User)
+model TechnicianProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  bio             String?
+  skills          String[] @default([])
+  experienceYears Int      @default(0)
+  hourlyRate      Float    @default(0)
+  location        String?
+  avgRating       Float    @default(0) // recalculated on each new review
+  totalReviews    Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  services     Service[]
+  bookings     Booking[]          @relation("TechnicianBookings")
+  reviews      Review[]
+  availability AvailabilitySlot[]
+
+  @@index([location])
+  @@index([avgRating])
+  @@map("technician_profiles")
+}
+
+// 3️⃣ AvailabilitySlots — technician weekly availability (1-many)
+model AvailabilitySlot {
+  id           String    @id @default(cuid())
+  technicianId String
+  day          DayOfWeek
+  startTime    String // "09:00"
+  endTime      String // "18:00"
+
+  technician TechnicianProfile @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@unique([technicianId, day]) // one slot per day per technician
+  @@map("availability_slots")
+}
+
+// 4️⃣ Categories — service categories (plumbing, electrical, etc.)
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  icon        String? // emoji or icon name
+  createdAt   DateTime @default(now())
+
+  services Service[]
+
+  @@map("categories")
+}
+
+// 5️⃣ Services — specific services offered by technicians
+model Service {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  price        Float // fixed service price (used as payment amount)
+  categoryId   String
+  technicianId String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category   Category          @relation(fields: [categoryId], references: [id])
+  technician TechnicianProfile @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  bookings   Booking[]
+
+  @@index([categoryId])
+  @@index([technicianId])
+  @@index([price])
+  @@map("services")
+}
+
+// 6️⃣ Bookings — jobs between customers and technicians
+model Booking {
+  id           String        @id @default(cuid())
+  customerId   String
+  technicianId String
+  serviceId    String
+  scheduledAt  DateTime
+  address      String
+  notes        String?
+  status       BookingStatus @default(REQUESTED)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  customer   User              @relation("CustomerBookings", fields: [customerId], references: [id])
+  technician TechnicianProfile @relation("TechnicianBookings", fields: [technicianId], references: [id])
+  service    Service           @relation(fields: [serviceId], references: [id])
+  payment    Payment? // 1-1: one payment per booking
+  review     Review? // 1-1: one review per booking
+
+  @@index([customerId])
+  @@index([technicianId])
+  @@index([status])
+  @@map("bookings")
+}
+
+// 7️⃣ Payments — SSLCommerz/Stripe transactions
+model Payment {
+  id            String          @id @default(cuid())
+  transactionId String          @unique // e.g. FIXIT-1720180000-AB12
+  bookingId     String          @unique // 1-1 with booking
+  amount        Float
+  currency      String          @default("BDT")
+  method        String? // bkash / card / nagad (from gateway response)
+  provider      PaymentProvider @default(SSLCOMMERZ)
+  status        PaymentStatus   @default(PENDING)
+  gatewayData   Json? // raw validation response (debugging + proof)
+  paidAt        DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@index([status])
+  @@map("payments")
+}
+
+// 8️⃣ Reviews — customer reviews after COMPLETED jobs
+model Review {
+  id           String   @id @default(cuid())
+  bookingId    String   @unique // 1-1: one review per booking
+  customerId   String
+  technicianId String
+  rating       Int // 1–5 (validated with Zod at API level)
+  comment      String?
+  createdAt    DateTime @default(now())
+
+  booking    Booking           @relation(fields: [bookingId], references: [id])
+  customer   User              @relation(fields: [customerId], references: [id])
+  technician TechnicianProfile @relation(fields: [technicianId], references: [id])
+
+  @@index([technicianId])
+  @@map("reviews")
+}
