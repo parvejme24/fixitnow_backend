@@ -1,12 +1,26 @@
 import { Router } from "express";
+import { authenticate } from "../../middleware/auth.js";
+import { requireTechnician } from "../../middleware/technician.js";
 import {
+    getBookings,
     getTechnicianProfile,
     getTechnicians,
+    updateAvailability,
+    updateBookingStatus,
+    updateProfile,
 } from "./technician.controller.js";
 
-const router = Router();
+const publicRouter = Router();
+const managementRouter = Router();
 
-router.get("/", getTechnicians);
-router.get("/:id", getTechnicianProfile);
+publicRouter.get("/", getTechnicians);
+publicRouter.get("/:id", getTechnicianProfile);
 
-export const technicianRoutes = router;
+managementRouter.use(authenticate, requireTechnician);
+managementRouter.put("/profile", updateProfile);
+managementRouter.put("/availability", updateAvailability);
+managementRouter.get("/bookings", getBookings);
+managementRouter.patch("/bookings/:id", updateBookingStatus);
+
+export const technicianRoutes = publicRouter;
+export const technicianManagementRoutes = managementRouter;
