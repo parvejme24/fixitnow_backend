@@ -60,8 +60,29 @@ export const updateBookingStatusSchema = z.object({
     status: z.enum(["ACCEPTED", "DECLINED", "IN_PROGRESS", "COMPLETED"]),
 });
 
+export const createServiceSchema = z.object({
+    title: z.string().min(2, "Title must be at least 2 characters"),
+    description: z.string().optional(),
+    price: z.coerce.number().positive("Price must be greater than 0"),
+    categoryId: z.string().min(1, "Category is required"),
+});
+
+export const updateServiceSchema = z
+    .object({
+        title: z.string().min(2, "Title must be at least 2 characters").optional(),
+        description: z.string().optional(),
+        price: z.coerce.number().positive("Price must be greater than 0").optional(),
+        categoryId: z.string().optional(),
+        isActive: z.boolean().optional(),
+    })
+    .refine((data) => Object.values(data).some((value) => value !== undefined), {
+        message: "At least one field is required to update",
+    });
+
 export type TechnicianQuery = z.infer<typeof technicianQuerySchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type UpdateAvailabilityInput = z.infer<typeof updateAvailabilitySchema>;
 export type TechnicianBookingQuery = z.infer<typeof technicianBookingQuerySchema>;
 export type UpdateBookingStatusInput = z.infer<typeof updateBookingStatusSchema>;
+export type CreateServiceInput = z.infer<typeof createServiceSchema>;
+export type UpdateServiceInput = z.infer<typeof updateServiceSchema>;

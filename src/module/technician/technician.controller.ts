@@ -1,11 +1,13 @@
 import { Request, Response } from "express";
 import { catchAsync } from "../../utils/catchAsync.js";
 import {
+    createServiceSchema,
     technicianBookingQuerySchema,
     technicianQuerySchema,
     updateAvailabilitySchema,
     updateBookingStatusSchema,
     updateProfileSchema,
+    updateServiceSchema,
 } from "./technician.interface.js";
 import * as technicianService from "./technician.service.js";
 
@@ -96,3 +98,57 @@ export const updateBookingStatus = catchAsync(
         });
     }
 );
+
+export const getServices = catchAsync(async (req: Request, res: Response) => {
+    const services = await technicianService.getTechnicianServices(
+        req.user!.userId
+    );
+
+    res.status(200).json({
+        success: true,
+        message: "Services fetched successfully",
+        data: services,
+    });
+});
+
+export const createService = catchAsync(async (req: Request, res: Response) => {
+    const payload = createServiceSchema.parse(req.body);
+    const service = await technicianService.createTechnicianService(
+        req.user!.userId,
+        payload
+    );
+
+    res.status(201).json({
+        success: true,
+        message: "Service created successfully",
+        data: service,
+    });
+});
+
+export const updateService = catchAsync(async (req: Request, res: Response) => {
+    const payload = updateServiceSchema.parse(req.body);
+    const service = await technicianService.updateTechnicianService(
+        req.user!.userId,
+        req.params.id as string,
+        payload
+    );
+
+    res.status(200).json({
+        success: true,
+        message: "Service updated successfully",
+        data: service,
+    });
+});
+
+export const deleteService = catchAsync(async (req: Request, res: Response) => {
+    const service = await technicianService.deleteTechnicianService(
+        req.user!.userId,
+        req.params.id as string
+    );
+
+    res.status(200).json({
+        success: true,
+        message: "Service deleted successfully",
+        data: service,
+    });
+});

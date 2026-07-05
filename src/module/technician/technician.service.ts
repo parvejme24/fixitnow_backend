@@ -3,11 +3,13 @@ import { Prisma } from "../../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../utils/AppError.js";
 import {
+    CreateServiceInput,
     TechnicianBookingQuery,
     TechnicianQuery,
     UpdateAvailabilityInput,
     UpdateBookingStatusInput,
     UpdateProfileInput,
+    UpdateServiceInput,
 } from "./technician.interface.js";
 
 const technicianListSelect = {
@@ -70,6 +72,23 @@ const profileSelect = {
             endTime: true,
         },
         orderBy: { day: "asc" as const },
+    },
+};
+
+const technicianServiceSelect = {
+    id: true,
+    title: true,
+    description: true,
+    price: true,
+    isActive: true,
+    createdAt: true,
+    updatedAt: true,
+    category: {
+        select: {
+            id: true,
+            name: true,
+            icon: true,
+        },
     },
 };
 
@@ -387,4 +406,110 @@ export const updateTechnicianBookingStatus = async (
         data: { status: payload.status },
         select: bookingSelect,
     });
+};
+
+const validateCategory = async (categoryId: string) => {
+    const category = await prisma.category.findUnique({
+        where: { id: categoryId },
+    });
+
+    if (!category) {
+        throw new AppError("Category not found", 404);
+    }
+
+    return category;
+};
+
+export const getTechnicianServices = async (userId: string) => {
+    const profile = await getTechnicianProfileByUserId(userId);
+
+    return prisma.service.findMany({
+        where: { technicianId: profile.id },
+        select: technicianServiceSelect,
+        orderBy: { createdAt: "desc" },
+    });
+};
+
+export const createTechnicianService = async (
+    userId: string,
+    payload: CreateServiceInput
+) => {
+    const profile = await getTechnicianProfileByUserId(userId);
+    await validateCategory(payload.categoryId);
+
+    return prisma.service.create({
+        data: {
+            title: payload.title,
+            description: payload.description,
+            price: payload.price,
+            categoryId: payload.categoryId,
+            technicianId: profile.id,
+        },
+        select: technicianServiceSelect,
+    });
+};
+
+export const updateTechnicianService = async (
+    userId: string,
+    serviceId: string,
+    payload: UpdateServiceInput
+) => {
+    const profile = await getTechnicianProfileByUserId(userId);
+
+    const service = await prisma.service.findFirst({
+        where: {
+            id: serviceId,
+            technicianId: profile.id,
+        },
+    });
+
+    if (!service) {
+        throw new AppError("Service not found", 404);
+    }
+
+    if (payload.categoryId) {
+        await validateCategory(payload.categoryId);
+    }
+
+    return prisma.service.update({
+        where: { id: serviceId },
+        data: payload,
+        select: technicianServiceSelect,
+    });
+};
+
+export const deleteTechnicianService = async (
+    userId: string,
+    serviceId: string
+) => {
+    const profile = await getTechnicianProfileByUserId(userId);
+
+    const service = await prisma.service.findFirst({
+        where: {
+            id: serviceId,
+            technicianId: profile.id,
+        },
+        include: {
+            _count: {
+                select: { bookings: true },
+            },
+        },
+    });
+
+    if (!service) {
+        throw new AppError("Service not found", 404);
+    }
+
+    if (service._count.bookings > 0) {
+        throw new AppError(
+            "Cannot delete service that has linked bookings. Deactivate it instead.",
+            400
+        );
+    }
+
+    await prisma.service.delete({
+        where: { id: serviceId },
+    });
+
+    return service;
 };

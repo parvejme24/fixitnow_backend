@@ -5,6 +5,7 @@ import config from "./config/index.js";
 import { globalErrorHandler } from "./middleware/globalErrorHandler.js";
 import { notFound } from "./middleware/notFound.js";
 import { authRoutes } from "./module/auth/auth.routes.js";
+import { bookingRoutes } from "./module/booking/booking.routes.js";
 import { adminCategoryRoutes, categoryRoutes } from "./module/category/category.routes.js";
 import { serviceRoutes } from "./module/service/service.routes.js";
 import {
@@ -35,6 +36,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/admin/categories", adminCategoryRoutes);
 app.use("/api/services", serviceRoutes);
+app.use("/api/bookings", bookingRoutes);
 app.use("/api/technicians", technicianRoutes);
 app.use("/api/technician", technicianManagementRoutes);
 app.use(notFound);
