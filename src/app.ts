@@ -5,6 +5,9 @@ import config from "./config/index.js";
 import { globalErrorHandler } from "./middleware/globalErrorHandler.js";
 import { notFound } from "./middleware/notFound.js";
 import { authRoutes } from "./module/auth/auth.routes.js";
+import { categoryRoutes } from "./module/category/category.routes.js";
+import { serviceRoutes } from "./module/service/service.routes.js";
+import { technicianRoutes } from "./module/technician/technician.routes.js";
 
 const app: Application = express();
 
@@ -26,6 +29,9 @@ app.get("/", (req: Request, res: Response) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/services", serviceRoutes);
+app.use("/api/technicians", technicianRoutes);
 app.use(notFound);
 app.use(globalErrorHandler);
 
