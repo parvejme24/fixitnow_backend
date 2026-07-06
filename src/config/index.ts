@@ -1,7 +1,12 @@
+const vercelUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : undefined;
+
 const config = {
     port: Number(process.env.PORT) || 5001,
     app_url: process.env.APP_URL || "http://localhost:3000",
-    backend_url: process.env.BACKEND_URL || "http://localhost:5001",
+    backend_url:
+        process.env.BACKEND_URL || vercelUrl || "http://localhost:5001",
     jwt_secret: process.env.JWT_SECRET || "fixitnow-jwt-secret",
     jwt_expires_in: process.env.JWT_EXPIRES_IN || "7d",
     stripe_secret_key: process.env.STRIPE_SECRET_KEY || "",
@@ -15,7 +20,7 @@ const config = {
     sp_prefix: process.env.SP_PREFIX || "SP",
     sp_return_url:
         process.env.SP_RETURN_URL ||
-        `${process.env.BACKEND_URL || "http://localhost:5001"}/api/payments/shurjopay/callback`,
+        `${process.env.BACKEND_URL || vercelUrl || "http://localhost:5001"}/api/payments/shurjopay/callback`,
     node_env: process.env.NODE_ENV || "development",
 };
 

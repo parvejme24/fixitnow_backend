@@ -289,6 +289,100 @@ Use separate Bearer tokens for customer and technician requests.
 
 ---
 
+## Deploy to Vercel
+
+This project is configured for [Vercel](https://vercel.com) serverless deployment.
+
+### Files added for Vercel
+
+| File | Purpose |
+|------|---------|
+| `api/index.ts` | Serverless entry point (exports Express app) |
+| `vercel.json` | Rewrites all routes to the API function |
+
+### Deploy steps
+
+#### Option A — Vercel CLI
+
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Login
+vercel login
+
+# Deploy (from project root)
+vercel
+
+# Deploy to production
+vercel --prod
+```
+
+#### Option B — GitHub integration
+
+1. Push this repo to GitHub
+2. Go to [vercel.com/new](https://vercel.com/new)
+3. Import your repository
+4. Vercel auto-detects settings from `vercel.json`
+5. Add environment variables (see below)
+6. Click **Deploy**
+
+### Required Vercel environment variables
+
+Set these in **Vercel Dashboard → Project → Settings → Environment Variables**:
+
+| Variable | Example | Notes |
+|----------|---------|-------|
+| `DATABASE_URL` | `postgresql://...-pooler...` | Use **pooled** Neon URL for serverless |
+| `JWT_SECRET` | `your-production-secret` | Strong random string |
+| `NODE_ENV` | `production` | |
+| `APP_URL` | `https://your-frontend.vercel.app` | Frontend URL for CORS |
+| `BACKEND_URL` | `https://your-api.vercel.app` | Your Vercel deployment URL |
+| `SP_ENDPOINT` | `https://sandbox.shurjopayment.com` | Or live endpoint |
+| `SP_USERNAME` | `sp_sandbox` | ShurjoPay credentials |
+| `SP_PASSWORD` | `your-password` | ShurjoPay credentials |
+| `SP_PREFIX` | `SP` | |
+| `SP_RETURN_URL` | `https://your-api.vercel.app/api/payments/shurjopay/callback` | Must match deployed URL |
+
+`VERCEL_URL` is set automatically by Vercel. If `BACKEND_URL` is omitted, the app falls back to `https://<VERCEL_URL>`.
+
+### Database setup (one time)
+
+Run locally against your production database before first deploy:
+
+```bash
+npx prisma db push
+```
+
+Or use Prisma Migrate if you add migrations later.
+
+### After deployment
+
+Test the API:
+
+```
+GET https://your-project.vercel.app/
+```
+
+Expected response: `Welcome to FixItNow API`
+
+API base URL:
+
+```
+https://your-project.vercel.app/api
+```
+
+Update your Postman `BaseURL` and ShurjoPay `SP_RETURN_URL` to the production URL.
+
+### Notes
+
+- Local dev still uses `npm run dev` with `src/server.ts`
+- Vercel uses `api/index.ts` as the serverless handler
+- Prisma client is generated automatically via `postinstall` / `vercel-build`
+- Use Neon **connection pooler** URL (`-pooler` in hostname) for serverless
+
+---
+
 ## License
 
 ISC

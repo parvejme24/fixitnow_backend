@@ -12,6 +12,6 @@
     "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["src/**/*", "generated/**/*"],
+  "include": ["src/**/*", "api/**/*", "generated/**/*"],
   "exclude": ["node_modules", "dist"]
 }
