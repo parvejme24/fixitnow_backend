@@ -2,6 +2,8 @@
 
 **Base URL:** `http://localhost:5001/api`
 
+**Production:** `https://your-project.vercel.app/api`
+
 **Version:** 1.0.0
 
 ---
@@ -12,21 +14,19 @@
 2. [Authentication](#authentication)
 3. [Response Format](#response-format)
 4. [Error Codes](#error-codes)
-5. [Pagination](#pagination)
-6. [Auth APIs](#auth-apis)
-7. [Public APIs](#public-apis)
-8. [Customer APIs](#customer-apis)
-9. [Technician APIs](#technician-apis)
-10. [Payment APIs](#payment-apis)
-11. [Review APIs](#review-apis)
-12. [Admin APIs](#admin-apis)
-13. [End-to-End Flow](#end-to-end-flow)
+5. [Auth APIs](#auth-apis)
+6. [Public APIs](#public-apis)
+7. [Customer APIs](#customer-apis)
+8. [Technician APIs](#technician-apis)
+9. [Payment APIs](#payment-apis)
+10. [Review APIs](#review-apis)
+11. [Admin APIs](#admin-apis)
+12. [End-to-End Flow](#end-to-end-flow)
+13. [Common Errors](#common-errors)
 
 ---
 
 ## Overview
-
-FixItNow is a home services marketplace API. Users register as **customers** or **technicians**. Customers browse services, book technicians, pay online, and leave reviews. Technicians manage profiles, services, availability, and job status.
 
 ### Roles
 
@@ -44,94 +44,36 @@ REQUESTED → ACCEPTED → PAID → IN_PROGRESS → COMPLETED
          ↘ CANCELLED
 ```
 
-| Status | Meaning |
-|--------|---------|
-| `REQUESTED` | Customer created booking; awaiting technician response |
-| `ACCEPTED` | Technician accepted; payment unlocked |
-| `DECLINED` | Technician declined |
-| `PAID` | Payment completed |
-| `IN_PROGRESS` | Technician started the job |
-| `COMPLETED` | Job finished; review unlocked |
-| `CANCELLED` | Booking cancelled |
-
 ---
 
 ## Authentication
 
-Protected endpoints require a JWT token.
-
-**Header:**
+Protected endpoints require:
 
 ```
 Authorization: Bearer <access_token>
+Content-Type: application/json
 ```
 
-Tokens are returned from `POST /auth/register` and `POST /auth/login`.
-
-**Token payload:**
-
-```json
-{
-  "userId": "cuid...",
-  "email": "user@example.com",
-  "role": "CUSTOMER"
-}
-```
-
-**Cookie (optional):** Login also sets an `accessToken` httpOnly cookie.
+Get token from `POST /auth/register` or `POST /auth/login`.
 
 ---
 
 ## Response Format
 
-### Success (single resource)
-
+**Success:**
 ```json
-{
-  "success": true,
-  "message": "Description of result",
-  "data": { }
-}
+{ "success": true, "message": "...", "data": {} }
 ```
 
-### Success (paginated list)
-
+**Paginated:**
 ```json
-{
-  "success": true,
-  "message": "Description of result",
-  "meta": {
-    "page": 1,
-    "limit": 10,
-    "total": 25,
-    "totalPages": 3
-  },
-  "data": []
-}
+{ "success": true, "message": "...", "meta": { "page": 1, "limit": 10, "total": 25, "totalPages": 3 }, "data": [] }
 ```
 
-### Validation error (400)
-
+**Error:**
 ```json
-{
-  "success": false,
-  "message": "Validation failed",
-  "errors": [
-    {
-      "field": "email",
-      "message": "Invalid email address"
-    }
-  ]
-}
-```
-
-### Application error
-
-```json
-{
-  "success": false,
-  "message": "Error description"
-}
+{ "success": false, "message": "Error description" }
 ```
 
 ---
@@ -140,43 +82,29 @@ Tokens are returned from `POST /auth/register` and `POST /auth/login`.
 
 | Status | Meaning |
 |--------|---------|
-| `400` | Bad request / validation / business rule violation |
+| `400` | Validation / business rule error |
 | `401` | Missing or invalid token |
-| `403` | Forbidden (wrong role or banned user) |
+| `403` | Wrong role or banned user |
 | `404` | Resource not found |
-| `409` | Conflict (e.g. email already registered) |
+| `409` | Conflict (duplicate email, review, etc.) |
 | `500` | Internal server error |
 | `502` | Payment gateway error |
 
 ---
 
-## Pagination
-
-List endpoints support query parameters:
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `page` | number | `1` | Page number (min: 1) |
-| `limit` | number | `10` | Items per page (min: 1, max: 100) |
-
-**Example:** `GET /api/services?page=1&limit=10`
+## Auth APIs
 
 ---
 
-## Auth APIs
+### 1. Register
 
-### Register
+**`POST /auth/register`**
 
-Create a new customer or technician account.
+| | |
+|---|---|
+| **Auth** | None (Public) |
 
-```
-POST /auth/register
-```
-
-**Auth:** Public
-
-**Body:**
-
+**Request body:**
 ```json
 {
   "name": "John Doe",
@@ -187,20 +115,69 @@ POST /auth/register
 }
 ```
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `name` | string | Yes | Min 2 characters |
-| `email` | string | Yes | Valid email |
-| `password` | string | Yes | Min 6 characters |
-| `phone` | string | No | |
-| `role` | string | Yes | `CUSTOMER` or `TECHNICIAN` |
+**Register as technician:**
+```json
+{
+  "name": "Md Parvej",
+  "email": "tech@example.com",
+  "password": "password123",
+  "phone": "01798765432",
+  "role": "TECHNICIAN"
+}
+```
 
-**Response (201):**
-
+**Response `201`:**
 ```json
 {
   "success": true,
   "message": "User registered successfully",
+  "data": {
+    "user": {
+      "id": "cmr85mm0800035najrx5t5wpa",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "phone": "01712345678",
+      "role": "CUSTOMER",
+      "status": "ACTIVE",
+      "createdAt": "2026-07-06T10:00:00.000Z",
+      "updatedAt": "2026-07-06T10:00:00.000Z"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbXI4NW1tMDgwMDAzNW5hanJ4NXQ1d3BhIiwiZW1haWwiOiJqb2huQGV4YW1wbGUuY29tIiwicm9sZSI6IkNVU1RPTUVSIiwiaWF0IjoxNzgzMzYwMDAwLCJleHAiOjE3ODM5NjQ4MDB9.xxx"
+  }
+}
+```
+
+**Error `409`:**
+```json
+{
+  "success": false,
+  "message": "Email is already registered"
+}
+```
+
+---
+
+### 2. Login
+
+**`POST /auth/login`**
+
+| | |
+|---|---|
+| **Auth** | None (Public) |
+
+**Request body:**
+```json
+{
+  "email": "john@example.com",
+  "password": "password123"
+}
+```
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Logged in successfully",
   "data": {
     "user": {
       "id": "cmr85mm0800035najrx5t5wpa",
@@ -217,56 +194,27 @@ POST /auth/register
 }
 ```
 
----
-
-### Login
-
-```
-POST /auth/login
-```
-
-**Auth:** Public
-
-**Body:**
-
+**Error `401`:**
 ```json
 {
-  "email": "john@example.com",
-  "password": "password123"
-}
-```
-
-**Response (200):**
-
-```json
-{
-  "success": true,
-  "message": "Logged in successfully",
-  "data": {
-    "user": {
-      "id": "cmr85mm0800035najrx5t5wpa",
-      "name": "John Doe",
-      "email": "john@example.com",
-      "role": "CUSTOMER",
-      "status": "ACTIVE"
-    },
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-  }
+  "success": false,
+  "message": "Invalid email or password"
 }
 ```
 
 ---
 
-### Get Current User
+### 3. Get Current User
 
-```
-GET /auth/me
-```
+**`GET /auth/me`**
 
-**Auth:** Bearer token (any role)
+| | |
+|---|---|
+| **Auth** | Bearer token (any role) |
 
-**Response (200):**
+**Request body:** None
 
+**Response `200` (Customer):**
 ```json
 {
   "success": true,
@@ -277,7 +225,35 @@ GET /auth/me
     "email": "john@example.com",
     "phone": "01712345678",
     "role": "CUSTOMER",
-    "status": "ACTIVE"
+    "status": "ACTIVE",
+    "createdAt": "2026-07-06T10:00:00.000Z",
+    "updatedAt": "2026-07-06T10:00:00.000Z",
+    "technicianProfile": null
+  }
+}
+```
+
+**Response `200` (Technician):**
+```json
+{
+  "success": true,
+  "message": "User profile fetched successfully",
+  "data": {
+    "id": "cmr85mm0800035najrx5t5wpa",
+    "name": "Md Parvej",
+    "email": "tech@example.com",
+    "role": "TECHNICIAN",
+    "status": "ACTIVE",
+    "technicianProfile": {
+      "id": "cmr87xylm0000gnajs79t2v38",
+      "bio": "Certified plumber",
+      "skills": ["Plumbing", "Pipe fitting"],
+      "experienceYears": 5,
+      "hourlyRate": 500,
+      "location": "Dhaka, Mirpur",
+      "avgRating": 4.5,
+      "totalReviews": 12
+    }
   }
 }
 ```
@@ -288,14 +264,1306 @@ GET /auth/me
 
 No authentication required.
 
-### List Categories
+---
 
+### 4. List Categories
+
+**`GET /categories`**
+
+**Request body:** None
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Categories fetched successfully",
+  "data": [
+    {
+      "id": "cmr8cd3fw00039pajy6j2qabf",
+      "name": "Plumbing",
+      "description": "Pipe and water related services",
+      "icon": "🔧",
+      "createdAt": "2026-07-05T10:00:00.000Z"
+    },
+    {
+      "id": "cmr8cd3fw00039pajy6j2qac0",
+      "name": "Electrical",
+      "description": "Electrical repair and installation",
+      "icon": "⚡",
+      "createdAt": "2026-07-05T10:00:00.000Z"
+    }
+  ]
+}
 ```
-GET /categories
+
+---
+
+### 5. List Services
+
+**`GET /services`**
+
+**Query parameters:**
+```
+GET /services?page=1&limit=10&categoryId=cmr8cd3fw00039pajy6j2qabf&minPrice=500&maxPrice=3000&location=Dhaka&search=pipe
 ```
 
-**Response (200):**
+| Param | Type | Description |
+|-------|------|-------------|
+| `page` | number | Page number (default: 1) |
+| `limit` | number | Items per page (default: 10) |
+| `categoryId` | string | Filter by category |
+| `location` | string | Filter by technician location |
+| `minRating` | number | Min technician rating (0–5) |
+| `minPrice` | number | Minimum price |
+| `maxPrice` | number | Maximum price |
+| `search` | string | Search title/description |
 
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Services fetched successfully",
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 2,
+    "totalPages": 1
+  },
+  "data": [
+    {
+      "id": "cmr8cd3fw00039pajy6j2qabf",
+      "title": "Pipe Leak Repair",
+      "description": "Fix leaking pipes in kitchen and bathroom",
+      "price": 1500,
+      "isActive": true,
+      "createdAt": "2026-07-05T12:00:00.000Z",
+      "updatedAt": "2026-07-05T12:00:00.000Z",
+      "category": {
+        "id": "cmr8cd3fw00039pajy6j2qabf",
+        "name": "Plumbing",
+        "icon": "🔧"
+      },
+      "technician": {
+        "id": "cmr87xylm0000gnajs79t2v38",
+        "location": "Dhaka, Mirpur",
+        "avgRating": 4.5,
+        "user": {
+          "id": "cmr85mm0800035najrx5t5wpa",
+          "name": "Md Parvej"
+        }
+      }
+    }
+  ]
+}
+```
+
+---
+
+### 6. List Technicians
+
+**`GET /technicians`**
+
+**Query parameters:**
+```
+GET /technicians?page=1&limit=10&location=Dhaka&minRating=4&categoryId=cmr8cd3fw00039pajy6j2qabf&search=plumber
+```
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Technicians fetched successfully",
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 1,
+    "totalPages": 1
+  },
+  "data": [
+    {
+      "id": "cmr87xylm0000gnajs79t2v38",
+      "bio": "Certified plumber with 5 years experience",
+      "skills": ["Plumbing", "Pipe fitting"],
+      "experienceYears": 5,
+      "hourlyRate": 500,
+      "location": "Dhaka, Mirpur",
+      "avgRating": 4.5,
+      "totalReviews": 12,
+      "user": {
+        "id": "cmr85mm0800035najrx5t5wpa",
+        "name": "Md Parvej",
+        "phone": "01798765432"
+      },
+      "services": [
+        {
+          "id": "cmr8cd3fw00039pajy6j2qabf",
+          "title": "Pipe Leak Repair",
+          "price": 1500,
+          "category": {
+            "id": "cmr8cd3fw00039pajy6j2qabf",
+            "name": "Plumbing"
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### 7. Get Technician Profile
+
+**`GET /technicians/:id`**
+
+**Example:** `GET /technicians/cmr87xylm0000gnajs79t2v38`
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Technician profile fetched successfully",
+  "data": {
+    "id": "cmr87xylm0000gnajs79t2v38",
+    "bio": "Certified plumber with 5 years experience",
+    "skills": ["Plumbing", "Pipe fitting", "Water heater"],
+    "experienceYears": 5,
+    "hourlyRate": 500,
+    "location": "Dhaka, Mirpur",
+    "avgRating": 4.5,
+    "totalReviews": 12,
+    "createdAt": "2026-07-05T10:00:00.000Z",
+    "user": {
+      "id": "cmr85mm0800035najrx5t5wpa",
+      "name": "Md Parvej",
+      "phone": "01798765432",
+      "email": "tech@example.com"
+    },
+    "services": [
+      {
+        "id": "cmr8cd3fw00039pajy6j2qabf",
+        "title": "Pipe Leak Repair",
+        "description": "Fix leaking pipes",
+        "price": 1500,
+        "category": {
+          "id": "cmr8cd3fw00039pajy6j2qabf",
+          "name": "Plumbing",
+          "icon": "🔧"
+        }
+      }
+    ],
+    "availability": [
+      {
+        "id": "cmr8avail0001",
+        "day": "SATURDAY",
+        "startTime": "09:00",
+        "endTime": "18:00"
+      },
+      {
+        "id": "cmr8avail0002",
+        "day": "MONDAY",
+        "startTime": "09:00",
+        "endTime": "18:00"
+      }
+    ],
+    "reviews": [
+      {
+        "id": "cmr9review001",
+        "rating": 5,
+        "comment": "Excellent work!",
+        "createdAt": "2026-07-06T15:00:00.000Z",
+        "customer": {
+          "id": "cmr85cust001",
+          "name": "John Doe"
+        }
+      }
+    ]
+  }
+}
+```
+
+**Error `404`:**
+```json
+{
+  "success": false,
+  "message": "Technician not found"
+}
+```
+
+---
+
+## Customer APIs
+
+**Required role:** `CUSTOMER`
+
+---
+
+### 8. Create Booking
+
+**`POST /bookings`**
+
+| | |
+|---|---|
+| **Auth** | Bearer token (Customer) |
+
+**Request body:**
+```json
+{
+  "serviceId": "cmr8cd3fw00039pajy6j2qabf",
+  "scheduledAt": "2026-07-10T10:00:00.000Z",
+  "address": "House 12, Road 5, Block C, Mirpur 10, Dhaka",
+  "notes": "Kitchen sink is leaking badly"
+}
+```
+
+**Response `201`:**
+```json
+{
+  "success": true,
+  "message": "Booking created successfully",
+  "data": {
+    "id": "cmr9jqeun0000c8ajp13sb43v",
+    "scheduledAt": "2026-07-10T10:00:00.000Z",
+    "address": "House 12, Road 5, Block C, Mirpur 10, Dhaka",
+    "notes": "Kitchen sink is leaking badly",
+    "status": "REQUESTED",
+    "createdAt": "2026-07-06T18:30:00.000Z",
+    "updatedAt": "2026-07-06T18:30:00.000Z",
+    "technician": {
+      "id": "cmr87xylm0000gnajs79t2v38",
+      "location": "Dhaka, Mirpur",
+      "avgRating": 4.5,
+      "user": {
+        "id": "cmr85mm0800035najrx5t5wpa",
+        "name": "Md Parvej",
+        "phone": "01798765432"
+      }
+    },
+    "service": {
+      "id": "cmr8cd3fw00039pajy6j2qabf",
+      "title": "Pipe Leak Repair",
+      "description": "Fix leaking pipes",
+      "price": 1500,
+      "category": {
+        "id": "cmr8cd3fw00039pajy6j2qabf",
+        "name": "Plumbing",
+        "icon": "🔧"
+      }
+    },
+    "payment": null,
+    "review": null
+  }
+}
+```
+
+---
+
+### 9. List My Bookings
+
+**`GET /bookings`**
+
+**Query parameters:**
+```
+GET /bookings?page=1&limit=10&status=ACCEPTED
+```
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Bookings fetched successfully",
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 1,
+    "totalPages": 1
+  },
+  "data": [
+    {
+      "id": "cmr9jqeun0000c8ajp13sb43v",
+      "scheduledAt": "2026-07-10T10:00:00.000Z",
+      "address": "House 12, Road 5, Block C, Mirpur 10, Dhaka",
+      "notes": "Kitchen sink is leaking badly",
+      "status": "ACCEPTED",
+      "createdAt": "2026-07-06T18:30:00.000Z",
+      "updatedAt": "2026-07-06T18:35:00.000Z",
+      "technician": {
+        "id": "cmr87xylm0000gnajs79t2v38",
+        "location": "Dhaka, Mirpur",
+        "avgRating": 4.5,
+        "user": {
+          "id": "cmr85mm0800035najrx5t5wpa",
+          "name": "Md Parvej",
+          "phone": "01798765432"
+        }
+      },
+      "service": {
+        "id": "cmr8cd3fw00039pajy6j2qabf",
+        "title": "Pipe Leak Repair",
+        "description": "Fix leaking pipes",
+        "price": 1500,
+        "category": {
+          "id": "cmr8cd3fw00039pajy6j2qabf",
+          "name": "Plumbing",
+          "icon": "🔧"
+        }
+      },
+      "payment": null,
+      "review": null
+    }
+  ]
+}
+```
+
+---
+
+### 10. Get Booking Details
+
+**`GET /bookings/:id`**
+
+**Example:** `GET /bookings/cmr9jqeun0000c8ajp13sb43v`
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Booking details fetched successfully",
+  "data": {
+    "id": "cmr9jqeun0000c8ajp13sb43v",
+    "scheduledAt": "2026-07-10T10:00:00.000Z",
+    "address": "House 12, Road 5, Block C, Mirpur 10, Dhaka",
+    "notes": "Kitchen sink is leaking badly",
+    "status": "PAID",
+    "createdAt": "2026-07-06T18:30:00.000Z",
+    "updatedAt": "2026-07-06T18:45:00.000Z",
+    "technician": {
+      "id": "cmr87xylm0000gnajs79t2v38",
+      "location": "Dhaka, Mirpur",
+      "avgRating": 4.5,
+      "user": {
+        "id": "cmr85mm0800035najrx5t5wpa",
+        "name": "Md Parvej",
+        "phone": "01798765432"
+      }
+    },
+    "service": {
+      "id": "cmr8cd3fw00039pajy6j2qabf",
+      "title": "Pipe Leak Repair",
+      "description": "Fix leaking pipes",
+      "price": 1500,
+      "category": {
+        "id": "cmr8cd3fw00039pajy6j2qabf",
+        "name": "Plumbing",
+        "icon": "🔧"
+      }
+    },
+    "payment": {
+      "id": "cmr9kfsv30000oaajgvhfdrno",
+      "status": "COMPLETED",
+      "amount": 1500,
+      "provider": "SHURJOPAY",
+      "paidAt": "2026-07-06T18:45:00.000Z"
+    },
+    "review": null
+  }
+}
+```
+
+---
+
+## Technician APIs
+
+**Base path:** `/technician`  
+**Required role:** `TECHNICIAN`
+
+---
+
+### 11. Update Profile
+
+**`PUT /technician/profile`**
+
+**Request body:**
+```json
+{
+  "bio": "Certified plumber with 5 years experience in residential plumbing",
+  "skills": ["Plumbing", "Pipe fitting", "Water heater"],
+  "experienceYears": 5,
+  "hourlyRate": 500,
+  "location": "Dhaka, Mirpur"
+}
+```
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Technician profile updated successfully",
+  "data": {
+    "id": "cmr87xylm0000gnajs79t2v38",
+    "bio": "Certified plumber with 5 years experience in residential plumbing",
+    "skills": ["Plumbing", "Pipe fitting", "Water heater"],
+    "experienceYears": 5,
+    "hourlyRate": 500,
+    "location": "Dhaka, Mirpur",
+    "avgRating": 4.5,
+    "totalReviews": 12,
+    "createdAt": "2026-07-05T10:00:00.000Z",
+    "updatedAt": "2026-07-06T19:00:00.000Z",
+    "user": {
+      "id": "cmr85mm0800035najrx5t5wpa",
+      "name": "Md Parvej",
+      "email": "tech@example.com",
+      "phone": "01798765432"
+    },
+    "availability": []
+  }
+}
+```
+
+---
+
+### 12. Update Availability
+
+**`PUT /technician/availability`**
+
+**Request body:**
+```json
+{
+  "slots": [
+    { "day": "SATURDAY", "startTime": "09:00", "endTime": "18:00" },
+    { "day": "SUNDAY", "startTime": "10:00", "endTime": "16:00" },
+    { "day": "MONDAY", "startTime": "09:00", "endTime": "18:00" },
+    { "day": "WEDNESDAY", "startTime": "09:00", "endTime": "18:00" },
+    { "day": "FRIDAY", "startTime": "09:00", "endTime": "18:00" }
+  ]
+}
+```
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Availability updated successfully",
+  "data": {
+    "id": "cmr87xylm0000gnajs79t2v38",
+    "bio": "Certified plumber",
+    "skills": ["Plumbing"],
+    "experienceYears": 5,
+    "hourlyRate": 500,
+    "location": "Dhaka, Mirpur",
+    "avgRating": 4.5,
+    "totalReviews": 12,
+    "user": {
+      "id": "cmr85mm0800035najrx5t5wpa",
+      "name": "Md Parvej",
+      "email": "tech@example.com",
+      "phone": "01798765432"
+    },
+    "availability": [
+      { "id": "cmr8avail0001", "day": "SATURDAY", "startTime": "09:00", "endTime": "18:00" },
+      { "id": "cmr8avail0002", "day": "SUNDAY", "startTime": "10:00", "endTime": "16:00" },
+      { "id": "cmr8avail0003", "day": "MONDAY", "startTime": "09:00", "endTime": "18:00" },
+      { "id": "cmr8avail0004", "day": "WEDNESDAY", "startTime": "09:00", "endTime": "18:00" },
+      { "id": "cmr8avail0005", "day": "FRIDAY", "startTime": "09:00", "endTime": "18:00" }
+    ]
+  }
+}
+```
+
+---
+
+### 13. List My Bookings (Technician)
+
+**`GET /technician/bookings`**
+
+**Query parameters:**
+```
+GET /technician/bookings?page=1&limit=10&status=REQUESTED
+```
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Bookings fetched successfully",
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 1,
+    "totalPages": 1
+  },
+  "data": [
+    {
+      "id": "cmr9jqeun0000c8ajp13sb43v",
+      "scheduledAt": "2026-07-10T10:00:00.000Z",
+      "address": "House 12, Road 5, Block C, Mirpur 10, Dhaka",
+      "notes": "Kitchen sink is leaking badly",
+      "status": "REQUESTED",
+      "createdAt": "2026-07-06T18:30:00.000Z",
+      "updatedAt": "2026-07-06T18:30:00.000Z",
+      "customer": {
+        "id": "cmr85cust001",
+        "name": "John Doe",
+        "email": "john@example.com",
+        "phone": "01712345678"
+      },
+      "service": {
+        "id": "cmr8cd3fw00039pajy6j2qabf",
+        "title": "Pipe Leak Repair",
+        "price": 1500,
+        "category": {
+          "id": "cmr8cd3fw00039pajy6j2qabf",
+          "name": "Plumbing"
+        }
+      },
+      "payment": null
+    }
+  ]
+}
+```
+
+---
+
+### 14. Update Booking Status
+
+**`PATCH /technician/bookings/:id`**
+
+**Accept booking:**
+```json
+{
+  "status": "ACCEPTED"
+}
+```
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Booking status updated successfully",
+  "data": {
+    "id": "cmr9jqeun0000c8ajp13sb43v",
+    "scheduledAt": "2026-07-10T10:00:00.000Z",
+    "address": "House 12, Road 5, Block C, Mirpur 10, Dhaka",
+    "notes": "Kitchen sink is leaking badly",
+    "status": "ACCEPTED",
+    "createdAt": "2026-07-06T18:30:00.000Z",
+    "updatedAt": "2026-07-06T18:35:00.000Z",
+    "customer": {
+      "id": "cmr85cust001",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "phone": "01712345678"
+    },
+    "service": {
+      "id": "cmr8cd3fw00039pajy6j2qabf",
+      "title": "Pipe Leak Repair",
+      "price": 1500,
+      "category": {
+        "id": "cmr8cd3fw00039pajy6j2qabf",
+        "name": "Plumbing"
+      }
+    },
+    "payment": null
+  }
+}
+```
+
+**Other status examples:**
+
+Decline:
+```json
+{ "status": "DECLINED" }
+```
+
+Start job (after payment):
+```json
+{ "status": "IN_PROGRESS" }
+```
+
+Complete job:
+```json
+{ "status": "COMPLETED" }
+```
+
+**Error `400`:**
+```json
+{
+  "success": false,
+  "message": "Cannot change booking status from REQUESTED to IN_PROGRESS"
+}
+```
+
+---
+
+### 15. List My Services
+
+**`GET /technician/services`**
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Services fetched successfully",
+  "data": [
+    {
+      "id": "cmr8cd3fw00039pajy6j2qabf",
+      "title": "Pipe Leak Repair",
+      "description": "Fix leaking pipes in kitchen and bathroom",
+      "price": 1500,
+      "isActive": true,
+      "createdAt": "2026-07-05T12:00:00.000Z",
+      "updatedAt": "2026-07-05T12:00:00.000Z",
+      "category": {
+        "id": "cmr8cd3fw00039pajy6j2qabf",
+        "name": "Plumbing",
+        "icon": "🔧"
+      }
+    }
+  ]
+}
+```
+
+---
+
+### 16. Create Service
+
+**`POST /technician/services`**
+
+**Request body:**
+```json
+{
+  "title": "Pipe Leak Repair",
+  "description": "Fix leaking pipes in kitchen and bathroom",
+  "price": 1500,
+  "categoryId": "cmr8cd3fw00039pajy6j2qabf"
+}
+```
+
+**Response `201`:**
+```json
+{
+  "success": true,
+  "message": "Service created successfully",
+  "data": {
+    "id": "cmr8cd3fw00039pajy6j2qabf",
+    "title": "Pipe Leak Repair",
+    "description": "Fix leaking pipes in kitchen and bathroom",
+    "price": 1500,
+    "isActive": true,
+    "createdAt": "2026-07-05T12:00:00.000Z",
+    "updatedAt": "2026-07-05T12:00:00.000Z",
+    "category": {
+      "id": "cmr8cd3fw00039pajy6j2qabf",
+      "name": "Plumbing",
+      "icon": "🔧"
+    }
+  }
+}
+```
+
+---
+
+### 17. Update Service
+
+**`PATCH /technician/services/:id`**
+
+**Request body:**
+```json
+{
+  "title": "Advanced Pipe Leak Repair",
+  "price": 1800,
+  "isActive": true
+}
+```
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Service updated successfully",
+  "data": {
+    "id": "cmr8cd3fw00039pajy6j2qabf",
+    "title": "Advanced Pipe Leak Repair",
+    "description": "Fix leaking pipes in kitchen and bathroom",
+    "price": 1800,
+    "isActive": true,
+    "createdAt": "2026-07-05T12:00:00.000Z",
+    "updatedAt": "2026-07-06T19:10:00.000Z",
+    "category": {
+      "id": "cmr8cd3fw00039pajy6j2qabf",
+      "name": "Plumbing",
+      "icon": "🔧"
+    }
+  }
+}
+```
+
+---
+
+### 18. Delete Service
+
+**`DELETE /technician/services/:id`**
+
+**Request body:** None
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Service deleted successfully",
+  "data": {
+    "id": "cmr8cd3fw00039pajy6j2qabf",
+    "title": "Pipe Leak Repair",
+    "description": "Fix leaking pipes",
+    "price": 1500,
+    "isActive": true,
+    "categoryId": "cmr8cd3fw00039pajy6j2qabf",
+    "technicianId": "cmr87xylm0000gnajs79t2v38"
+  }
+}
+```
+
+**Error `400`:**
+```json
+{
+  "success": false,
+  "message": "Cannot delete service that has linked bookings. Deactivate it instead."
+}
+```
+
+---
+
+## Payment APIs
+
+---
+
+### 19. ShurjoPay Callback (Public)
+
+**`GET /payments/shurjopay/callback?order_id=SP1783363257829`**
+
+| | |
+|---|---|
+| **Auth** | None |
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "ShurjoPay payment verified successfully",
+  "data": {
+    "id": "cmr9kfsv30000oaajgvhfdrno",
+    "transactionId": "SP1783363257829",
+    "bookingId": "cmr9jqeun0000c8ajp13sb43v",
+    "amount": 1500,
+    "currency": "BDT",
+    "provider": "SHURJOPAY",
+    "status": "COMPLETED",
+    "paidAt": "2026-07-06T18:45:00.000Z",
+    "booking": {
+      "id": "cmr9jqeun0000c8ajp13sb43v",
+      "status": "PAID"
+    }
+  }
+}
+```
+
+---
+
+### 20. Create Payment
+
+**`POST /payments/create`**
+
+| | |
+|---|---|
+| **Auth** | Bearer token (Customer) |
+| **Prerequisite** | Booking status must be `ACCEPTED` |
+
+**Request body (ShurjoPay):**
+```json
+{
+  "bookingId": "cmr9jqeun0000c8ajp13sb43v",
+  "provider": "SHURJOPAY"
+}
+```
+
+**Request body (SSLCommerz):**
+```json
+{
+  "bookingId": "cmr9jqeun0000c8ajp13sb43v",
+  "provider": "SSLCOMMERZ"
+}
+```
+
+**Request body (Stripe):**
+```json
+{
+  "bookingId": "cmr9jqeun0000c8ajp13sb43v",
+  "provider": "STRIPE"
+}
+```
+
+**Response `201`:**
+```json
+{
+  "success": true,
+  "message": "Payment session created successfully",
+  "data": {
+    "payment": {
+      "id": "cmr9kfsv30000oaajgvhfdrno",
+      "transactionId": "SP1783363257829",
+      "bookingId": "cmr9jqeun0000c8ajp13sb43v",
+      "amount": 1500,
+      "currency": "BDT",
+      "method": null,
+      "provider": "SHURJOPAY",
+      "status": "PENDING",
+      "paidAt": null,
+      "createdAt": "2026-07-06T18:40:58.335Z",
+      "updatedAt": "2026-07-06T18:41:00.865Z",
+      "booking": {
+        "id": "cmr9jqeun0000c8ajp13sb43v",
+        "status": "ACCEPTED",
+        "scheduledAt": "2026-07-10T10:00:00.000Z",
+        "address": "House 12, Road 5, Block C, Mirpur 10, Dhaka",
+        "service": {
+          "id": "cmr8cd3fw00039pajy6j2qabf",
+          "title": "Pipe Leak Repair",
+          "price": 1500
+        },
+        "technician": {
+          "id": "cmr87xylm0000gnajs79t2v38",
+          "user": {
+            "id": "cmr85mm0800035najrx5t5wpa",
+            "name": "Md Parvej"
+          }
+        }
+      }
+    },
+    "gatewayUrl": "https://sandbox.securepay.shurjopayment.com/spaycheckout/?token=eyJ...&order_id=SP6a4bf6bc945aa",
+    "sessionId": null
+  }
+}
+```
+
+| Response field | Use as |
+|----------------|--------|
+| `data.payment.id` | `paymentId` in confirm |
+| `data.payment.transactionId` | `orderId` in confirm |
+| `data.gatewayUrl` | Open in browser to pay |
+
+**Error `400`:**
+```json
+{
+  "success": false,
+  "message": "Payment can only be created for accepted bookings. Current status: REQUESTED. Ask the technician to accept the booking first."
+}
+```
+
+---
+
+### 21. Confirm Payment
+
+**`POST /payments/confirm`**
+
+| | |
+|---|---|
+| **Auth** | Bearer token (Customer) |
+| **Prerequisite** | Payment completed on gateway |
+
+**ShurjoPay:**
+```json
+{
+  "paymentId": "cmr9kfsv30000oaajgvhfdrno",
+  "orderId": "SP1783363257829"
+}
+```
+
+**SSLCommerz:**
+```json
+{
+  "paymentId": "cmr9kfsv30000oaajgvhfdrno",
+  "val_id": "VALIDATION_ID_FROM_SSLCOMMERZ"
+}
+```
+
+**Stripe:**
+```json
+{
+  "paymentId": "cmr9kfsv30000oaajgvhfdrno",
+  "sessionId": "cs_test_a1b2c3d4e5f6"
+}
+```
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Payment confirmed successfully",
+  "data": {
+    "id": "cmr9kfsv30000oaajgvhfdrno",
+    "transactionId": "SP1783363257829",
+    "bookingId": "cmr9jqeun0000c8ajp13sb43v",
+    "amount": 1500,
+    "currency": "BDT",
+    "method": "bkash",
+    "provider": "SHURJOPAY",
+    "status": "COMPLETED",
+    "paidAt": "2026-07-06T18:45:00.000Z",
+    "createdAt": "2026-07-06T18:40:58.335Z",
+    "updatedAt": "2026-07-06T18:45:00.000Z",
+    "booking": {
+      "id": "cmr9jqeun0000c8ajp13sb43v",
+      "status": "PAID",
+      "scheduledAt": "2026-07-10T10:00:00.000Z",
+      "address": "House 12, Road 5, Block C, Mirpur 10, Dhaka",
+      "service": {
+        "id": "cmr8cd3fw00039pajy6j2qabf",
+        "title": "Pipe Leak Repair",
+        "price": 1500
+      },
+      "technician": {
+        "id": "cmr87xylm0000gnajs79t2v38",
+        "user": {
+          "id": "cmr85mm0800035najrx5t5wpa",
+          "name": "Md Parvej"
+        }
+      }
+    }
+  }
+}
+```
+
+---
+
+### 22. List My Payments
+
+**`GET /payments`**
+
+**Query parameters:**
+```
+GET /payments?page=1&limit=10&status=COMPLETED
+```
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Payments fetched successfully",
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 1,
+    "totalPages": 1
+  },
+  "data": [
+    {
+      "id": "cmr9kfsv30000oaajgvhfdrno",
+      "transactionId": "SP1783363257829",
+      "bookingId": "cmr9jqeun0000c8ajp13sb43v",
+      "amount": 1500,
+      "currency": "BDT",
+      "method": "bkash",
+      "provider": "SHURJOPAY",
+      "status": "COMPLETED",
+      "paidAt": "2026-07-06T18:45:00.000Z",
+      "createdAt": "2026-07-06T18:40:58.335Z",
+      "updatedAt": "2026-07-06T18:45:00.000Z",
+      "booking": {
+        "id": "cmr9jqeun0000c8ajp13sb43v",
+        "status": "PAID",
+        "service": {
+          "id": "cmr8cd3fw00039pajy6j2qabf",
+          "title": "Pipe Leak Repair",
+          "price": 1500
+        }
+      }
+    }
+  ]
+}
+```
+
+---
+
+### 23. Get Payment Details
+
+**`GET /payments/:id`**
+
+**Example:** `GET /payments/cmr9kfsv30000oaajgvhfdrno`
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Payment details fetched successfully",
+  "data": {
+    "id": "cmr9kfsv30000oaajgvhfdrno",
+    "transactionId": "SP1783363257829",
+    "bookingId": "cmr9jqeun0000c8ajp13sb43v",
+    "amount": 1500,
+    "currency": "BDT",
+    "method": "bkash",
+    "provider": "SHURJOPAY",
+    "status": "COMPLETED",
+    "paidAt": "2026-07-06T18:45:00.000Z",
+    "createdAt": "2026-07-06T18:40:58.335Z",
+    "updatedAt": "2026-07-06T18:45:00.000Z",
+    "booking": {
+      "id": "cmr9jqeun0000c8ajp13sb43v",
+      "status": "PAID",
+      "scheduledAt": "2026-07-10T10:00:00.000Z",
+      "address": "House 12, Road 5, Block C, Mirpur 10, Dhaka",
+      "service": {
+        "id": "cmr8cd3fw00039pajy6j2qabf",
+        "title": "Pipe Leak Repair",
+        "price": 1500
+      },
+      "technician": {
+        "id": "cmr87xylm0000gnajs79t2v38",
+        "user": {
+          "id": "cmr85mm0800035najrx5t5wpa",
+          "name": "Md Parvej"
+        }
+      }
+    }
+  }
+}
+```
+
+---
+
+## Review APIs
+
+---
+
+### 24. Create Review
+
+**`POST /reviews`**
+
+| | |
+|---|---|
+| **Auth** | Bearer token (Customer) |
+| **Prerequisite** | Booking status must be `COMPLETED` |
+
+**Request body:**
+```json
+{
+  "bookingId": "cmr9jqeun0000c8ajp13sb43v",
+  "rating": 5,
+  "comment": "Excellent work, very professional and on time!"
+}
+```
+
+**Response `201`:**
+```json
+{
+  "success": true,
+  "message": "Review created successfully",
+  "data": {
+    "id": "cmr9review001",
+    "rating": 5,
+    "comment": "Excellent work, very professional and on time!",
+    "createdAt": "2026-07-06T20:00:00.000Z",
+    "booking": {
+      "id": "cmr9jqeun0000c8ajp13sb43v",
+      "status": "COMPLETED",
+      "service": {
+        "id": "cmr8cd3fw00039pajy6j2qabf",
+        "title": "Pipe Leak Repair"
+      }
+    },
+    "technician": {
+      "id": "cmr87xylm0000gnajs79t2v38",
+      "avgRating": 4.6,
+      "totalReviews": 13,
+      "user": {
+        "id": "cmr85mm0800035najrx5t5wpa",
+        "name": "Md Parvej"
+      }
+    }
+  }
+}
+```
+
+**Error `400`:**
+```json
+{
+  "success": false,
+  "message": "Review can only be created for completed bookings"
+}
+```
+
+**Error `409`:**
+```json
+{
+  "success": false,
+  "message": "Review already exists for this booking"
+}
+```
+
+---
+
+## Admin APIs
+
+**Base path:** `/admin`  
+**Required role:** `ADMIN`
+
+---
+
+### 25. List Users
+
+**`GET /admin/users`**
+
+**Query parameters:**
+```
+GET /admin/users?page=1&limit=10&role=TECHNICIAN&status=ACTIVE&search=parvej
+```
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Users fetched successfully",
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 3,
+    "totalPages": 1
+  },
+  "data": [
+    {
+      "id": "cmr85mm0800035najrx5t5wpa",
+      "name": "Md Parvej",
+      "email": "tech@example.com",
+      "phone": "01798765432",
+      "role": "TECHNICIAN",
+      "status": "ACTIVE",
+      "createdAt": "2026-07-05T10:00:00.000Z",
+      "updatedAt": "2026-07-05T10:00:00.000Z",
+      "technicianProfile": {
+        "id": "cmr87xylm0000gnajs79t2v38",
+        "location": "Dhaka, Mirpur",
+        "avgRating": 4.5
+      },
+      "_count": {
+        "bookings": 5,
+        "reviews": 0
+      }
+    }
+  ]
+}
+```
+
+---
+
+### 26. Update User Status
+
+**`PATCH /admin/users/:id`**
+
+**Ban user:**
+```json
+{
+  "status": "BANNED"
+}
+```
+
+**Unban user:**
+```json
+{
+  "status": "ACTIVE"
+}
+```
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "User status updated successfully",
+  "data": {
+    "id": "cmr85mm0800035najrx5t5wpa",
+    "name": "Md Parvej",
+    "email": "tech@example.com",
+    "phone": "01798765432",
+    "role": "TECHNICIAN",
+    "status": "BANNED",
+    "createdAt": "2026-07-05T10:00:00.000Z",
+    "updatedAt": "2026-07-06T21:00:00.000Z"
+  }
+}
+```
+
+---
+
+### 27. List All Bookings (Admin)
+
+**`GET /admin/bookings`**
+
+**Query parameters:**
+```
+GET /admin/bookings?page=1&limit=10&status=PAID
+```
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Bookings fetched successfully",
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 1,
+    "totalPages": 1
+  },
+  "data": [
+    {
+      "id": "cmr9jqeun0000c8ajp13sb43v",
+      "scheduledAt": "2026-07-10T10:00:00.000Z",
+      "address": "House 12, Road 5, Block C, Mirpur 10, Dhaka",
+      "notes": "Kitchen sink is leaking badly",
+      "status": "PAID",
+      "createdAt": "2026-07-06T18:30:00.000Z",
+      "updatedAt": "2026-07-06T18:45:00.000Z",
+      "customer": {
+        "id": "cmr85cust001",
+        "name": "John Doe",
+        "email": "john@example.com",
+        "phone": "01712345678"
+      },
+      "technician": {
+        "id": "cmr87xylm0000gnajs79t2v38",
+        "location": "Dhaka, Mirpur",
+        "user": {
+          "id": "cmr85mm0800035najrx5t5wpa",
+          "name": "Md Parvej",
+          "email": "tech@example.com"
+        }
+      },
+      "service": {
+        "id": "cmr8cd3fw00039pajy6j2qabf",
+        "title": "Pipe Leak Repair",
+        "price": 1500,
+        "category": {
+          "id": "cmr8cd3fw00039pajy6j2qabf",
+          "name": "Plumbing"
+        }
+      },
+      "payment": {
+        "id": "cmr9kfsv30000oaajgvhfdrno",
+        "status": "COMPLETED",
+        "amount": 1500,
+        "provider": "SHURJOPAY"
+      }
+    }
+  ]
+}
+```
+
+---
+
+### 28. List Categories (Admin)
+
+**`GET /admin/categories`**
+
+**Response `200`:**
 ```json
 {
   "success": true,
@@ -314,579 +1582,11 @@ GET /categories
 
 ---
 
-### List Services
+### 29. Create Category (Admin)
 
-```
-GET /services
-```
+**`POST /admin/categories`**
 
-**Query parameters:**
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `page` | number | Page number |
-| `limit` | number | Items per page |
-| `categoryId` | string | Filter by category |
-| `location` | string | Filter by technician location |
-| `minRating` | number | Min technician rating (0–5) |
-| `minPrice` | number | Minimum service price |
-| `maxPrice` | number | Maximum service price |
-| `search` | string | Search title/description |
-
-**Example:** `GET /services?categoryId=abc&minPrice=500&maxPrice=3000`
-
-**Response (200):**
-
-```json
-{
-  "success": true,
-  "message": "Services fetched successfully",
-  "meta": { "page": 1, "limit": 10, "total": 5, "totalPages": 1 },
-  "data": [
-    {
-      "id": "cmr8cd3fw00039pajy6j2qabf",
-      "title": "Pipe Leak Repair",
-      "description": "Fix leaking pipes",
-      "price": 1500,
-      "isActive": true,
-      "category": { "id": "...", "name": "Plumbing", "icon": "🔧" },
-      "technician": {
-        "id": "cmr87xylm0000gnajs79t2v38",
-        "location": "Dhaka",
-        "avgRating": 4.5,
-        "user": { "id": "...", "name": "Md Parvej" }
-      }
-    }
-  ]
-}
-```
-
----
-
-### List Technicians
-
-```
-GET /technicians
-```
-
-**Query parameters:**
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `page` | number | Page number |
-| `limit` | number | Items per page |
-| `location` | string | Filter by location |
-| `minRating` | number | Minimum average rating |
-| `categoryId` | string | Has active service in category |
-| `search` | string | Search name, location, bio |
-
-**Response (200):**
-
-```json
-{
-  "success": true,
-  "message": "Technicians fetched successfully",
-  "meta": { "page": 1, "limit": 10, "total": 3, "totalPages": 1 },
-  "data": [
-    {
-      "id": "cmr87xylm0000gnajs79t2v38",
-      "bio": "Experienced plumber",
-      "skills": ["Plumbing", "Pipe fitting"],
-      "experienceYears": 5,
-      "hourlyRate": 500,
-      "location": "Dhaka",
-      "avgRating": 4.5,
-      "totalReviews": 12,
-      "user": { "id": "...", "name": "Md Parvej", "phone": "017..." }
-    }
-  ]
-}
-```
-
----
-
-### Get Technician Profile
-
-```
-GET /technicians/:id
-```
-
-**Response (200):** Full technician profile including services, availability slots, and recent reviews.
-
----
-
-## Customer APIs
-
-**Required role:** `CUSTOMER`
-
-### Create Booking
-
-```
-POST /bookings
-```
-
-**Body:**
-
-```json
-{
-  "serviceId": "cmr8cd3fw00039pajy6j2qabf",
-  "scheduledAt": "2026-07-10T10:00:00.000Z",
-  "address": "House 12, Road 5, Block C, Mirpur 10, Dhaka",
-  "notes": "Kitchen sink is leaking"
-}
-```
-
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `serviceId` | string | Yes | Active service ID |
-| `scheduledAt` | date (ISO) | Yes | Future date/time |
-| `address` | string | Yes | Min 5 characters |
-| `notes` | string | No | Extra instructions |
-
-**Response (201):** Booking with `status: "REQUESTED"`
-
----
-
-### List My Bookings
-
-```
-GET /bookings
-```
-
-**Query parameters:**
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `page` | number | Page number |
-| `limit` | number | Items per page |
-| `status` | string | Filter: `REQUESTED`, `ACCEPTED`, `PAID`, `IN_PROGRESS`, `COMPLETED`, `DECLINED`, `CANCELLED` |
-
-**Example:** `GET /bookings?status=ACCEPTED&page=1`
-
----
-
-### Get Booking Details
-
-```
-GET /bookings/:id
-```
-
-Returns booking with service, technician, payment, and review info.
-
----
-
-## Technician APIs
-
-**Base path:** `/technician`
-
-**Required role:** `TECHNICIAN`
-
-### Update Profile
-
-```
-PUT /technician/profile
-```
-
-**Body (at least one field required):**
-
-```json
-{
-  "bio": "Certified plumber with 5 years experience",
-  "skills": ["Plumbing", "Pipe fitting", "Water heater"],
-  "experienceYears": 5,
-  "hourlyRate": 500,
-  "location": "Dhaka, Mirpur"
-}
-```
-
----
-
-### Update Availability
-
-```
-PUT /technician/availability
-```
-
-**Body:**
-
-```json
-{
-  "slots": [
-    { "day": "SATURDAY", "startTime": "09:00", "endTime": "18:00" },
-    { "day": "SUNDAY", "startTime": "10:00", "endTime": "16:00" },
-    { "day": "MONDAY", "startTime": "09:00", "endTime": "18:00" }
-  ]
-}
-```
-
-| Field | Values |
-|-------|--------|
-| `day` | `SATURDAY`, `SUNDAY`, `MONDAY`, `TUESDAY`, `WEDNESDAY`, `THURSDAY`, `FRIDAY` |
-| `startTime` | `HH:mm` format (e.g. `09:00`) |
-| `endTime` | `HH:mm` format (must be after `startTime`) |
-
----
-
-### List My Bookings
-
-```
-GET /technician/bookings
-```
-
-**Query parameters:** `page`, `limit`, `status` (same status values as customer bookings)
-
----
-
-### Update Booking Status
-
-```
-PATCH /technician/bookings/:id
-```
-
-**Body:**
-
-```json
-{
-  "status": "ACCEPTED"
-}
-```
-
-**Allowed transitions:**
-
-| Current status | Allowed next statuses |
-|----------------|----------------------|
-| `REQUESTED` | `ACCEPTED`, `DECLINED` |
-| `PAID` | `IN_PROGRESS` |
-| `IN_PROGRESS` | `COMPLETED` |
-
-**Examples:**
-
-Accept a booking:
-```json
-{ "status": "ACCEPTED" }
-```
-
-Decline a booking:
-```json
-{ "status": "DECLINED" }
-```
-
-Start job (after payment):
-```json
-{ "status": "IN_PROGRESS" }
-```
-
-Complete job:
-```json
-{ "status": "COMPLETED" }
-```
-
----
-
-### Manage Services
-
-#### List my services
-
-```
-GET /technician/services
-```
-
-#### Create service
-
-```
-POST /technician/services
-```
-
-**Body:**
-
-```json
-{
-  "title": "Pipe Leak Repair",
-  "description": "Fix leaking pipes in kitchen and bathroom",
-  "price": 1500,
-  "categoryId": "cmr8cd3fw00039pajy6j2qabf"
-}
-```
-
-#### Update service
-
-```
-PATCH /technician/services/:id
-```
-
-**Body (at least one field):**
-
-```json
-{
-  "title": "Updated title",
-  "description": "Updated description",
-  "price": 1800,
-  "categoryId": "...",
-  "isActive": false
-}
-```
-
-#### Delete service
-
-```
-DELETE /technician/services/:id
-```
-
-Fails if the service has linked bookings. Use `isActive: false` instead.
-
----
-
-## Payment APIs
-
-### ShurjoPay Callback (public)
-
-```
-GET /payments/shurjopay/callback?order_id=SP1783363257829
-POST /payments/shurjopay/callback
-```
-
-**Auth:** None
-
-Verifies payment with ShurjoPay and marks booking as `PAID`.
-
----
-
-### Create Payment Session
-
-```
-POST /payments/create
-```
-
-**Auth:** Customer
-
-**Prerequisite:** Booking status must be `ACCEPTED`
-
-**Body:**
-
-```json
-{
-  "bookingId": "cmr9jqeun0000c8ajp13sb43v",
-  "provider": "SHURJOPAY"
-}
-```
-
-| Field | Type | Values |
-|-------|------|--------|
-| `bookingId` | string | Booking ID |
-| `provider` | string | `SHURJOPAY`, `SSLCOMMERZ`, `STRIPE` |
-
-**Response (201):**
-
-```json
-{
-  "success": true,
-  "message": "Payment session created successfully",
-  "data": {
-    "payment": {
-      "id": "cmr9kfsv30000oaajgvhfdrno",
-      "transactionId": "SP1783363257829",
-      "bookingId": "cmr9jqeun0000c8ajp13sb43v",
-      "amount": 1500,
-      "currency": "BDT",
-      "provider": "SHURJOPAY",
-      "status": "PENDING",
-      "paidAt": null,
-      "booking": {
-        "id": "cmr9jqeun0000c8ajp13sb43v",
-        "status": "ACCEPTED"
-      }
-    },
-    "gatewayUrl": "https://sandbox.securepay.shurjopayment.com/spaycheckout/?token=...",
-    "sessionId": null
-  }
-}
-```
-
-**Field mapping for confirm:**
-
-| Response field | Confirm field |
-|----------------|---------------|
-| `payment.id` | `paymentId` |
-| `payment.transactionId` | `orderId` |
-
-Open `gatewayUrl` in a browser to complete payment before confirming.
-
----
-
-### Confirm Payment
-
-```
-POST /payments/confirm
-```
-
-**Auth:** Customer
-
-#### ShurjoPay
-
-```json
-{
-  "paymentId": "cmr9kfsv30000oaajgvhfdrno",
-  "orderId": "SP1783363257829"
-}
-```
-
-`orderId` is optional — defaults to `payment.transactionId`.
-
-#### SSLCommerz
-
-```json
-{
-  "paymentId": "pay_id_here",
-  "val_id": "VALIDATION_ID_FROM_SSLCOMMERZ"
-}
-```
-
-#### Stripe
-
-```json
-{
-  "paymentId": "pay_id_here",
-  "sessionId": "cs_test_..."
-}
-```
-
-**Response (200):**
-
-```json
-{
-  "success": true,
-  "message": "Payment confirmed successfully",
-  "data": {
-    "id": "cmr9kfsv30000oaajgvhfdrno",
-    "status": "COMPLETED",
-    "paidAt": "2026-07-06T18:45:00.000Z",
-    "booking": {
-      "status": "PAID"
-    }
-  }
-}
-```
-
----
-
-### List My Payments
-
-```
-GET /payments
-```
-
-**Query parameters:** `page`, `limit`, `status` (`PENDING`, `COMPLETED`, `FAILED`, `CANCELLED`)
-
----
-
-### Get Payment Details
-
-```
-GET /payments/:id
-```
-
----
-
-## Review APIs
-
-### Create Review
-
-```
-POST /reviews
-```
-
-**Auth:** Customer
-
-**Prerequisite:** Booking status must be `COMPLETED`
-
-**Body:**
-
-```json
-{
-  "bookingId": "cmr9jqeun0000c8ajp13sb43v",
-  "rating": 5,
-  "comment": "Excellent work, very professional!"
-}
-```
-
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `bookingId` | string | Yes | Completed booking ID |
-| `rating` | number | Yes | Integer 1–5 |
-| `comment` | string | No | Optional feedback |
-
-**Response (201):** Review object. Technician `avgRating` and `totalReviews` are updated automatically.
-
----
-
-## Admin APIs
-
-**Base path:** `/admin`
-
-**Required role:** `ADMIN`
-
-### List Users
-
-```
-GET /admin/users
-```
-
-**Query parameters:**
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `page` | number | Page number |
-| `limit` | number | Items per page |
-| `role` | string | `CUSTOMER`, `TECHNICIAN`, `ADMIN` |
-| `status` | string | `ACTIVE`, `BANNED` |
-| `search` | string | Search name or email |
-
----
-
-### Update User Status
-
-```
-PATCH /admin/users/:id
-```
-
-**Body:**
-
-```json
-{
-  "status": "BANNED"
-}
-```
-
-Values: `ACTIVE`, `BANNED`
-
----
-
-### List All Bookings
-
-```
-GET /admin/bookings
-```
-
-**Query parameters:** `page`, `limit`, `status`
-
----
-
-### Manage Categories
-
-#### List categories
-
-```
-GET /admin/categories
-```
-
-#### Create category
-
-```
-POST /admin/categories
-```
-
-**Body:**
-
+**Request body:**
 ```json
 {
   "name": "Plumbing",
@@ -895,97 +1595,208 @@ POST /admin/categories
 }
 ```
 
-#### Update category
-
+**Response `201`:**
+```json
+{
+  "success": true,
+  "message": "Category created successfully",
+  "data": {
+    "id": "cmr8cd3fw00039pajy6j2qabf",
+    "name": "Plumbing",
+    "description": "Water and pipe related services",
+    "icon": "🔧",
+    "createdAt": "2026-07-05T10:00:00.000Z"
+  }
+}
 ```
-PATCH /admin/categories/:id
-```
 
-**Body (at least one field):**
+---
 
+### 30. Update Category (Admin)
+
+**`PATCH /admin/categories/:id`**
+
+**Request body:**
 ```json
 {
   "name": "Plumbing & Water",
-  "description": "Updated description",
+  "description": "All water and pipe services",
   "icon": "🚿"
 }
 ```
 
-#### Delete category
-
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Category updated successfully",
+  "data": {
+    "id": "cmr8cd3fw00039pajy6j2qabf",
+    "name": "Plumbing & Water",
+    "description": "All water and pipe services",
+    "icon": "🚿",
+    "createdAt": "2026-07-05T10:00:00.000Z"
+  }
+}
 ```
-DELETE /admin/categories/:id
+
+---
+
+### 31. Delete Category (Admin)
+
+**`DELETE /admin/categories/:id`**
+
+**Request body:** None
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Category deleted successfully",
+  "data": {
+    "id": "cmr8cd3fw00039pajy6j2qabf",
+    "name": "Plumbing",
+    "description": "Water and pipe related services",
+    "icon": "🔧",
+    "createdAt": "2026-07-05T10:00:00.000Z"
+  }
+}
 ```
 
 ---
 
 ## End-to-End Flow
 
-Complete test flow using Postman:
+Complete Postman test sequence:
 
 ### Step 1 — Register users
 
 ```http
 POST /api/auth/register
-{ "name": "Customer", "email": "customer@test.com", "password": "123456", "role": "CUSTOMER" }
-
-POST /api/auth/register
-{ "name": "Technician", "email": "tech@test.com", "password": "123456", "role": "TECHNICIAN" }
+```
+```json
+{ "name": "John Doe", "email": "customer@test.com", "password": "123456", "phone": "01712345678", "role": "CUSTOMER" }
 ```
 
-Save both tokens.
+```http
+POST /api/auth/register
+```
+```json
+{ "name": "Md Parvej", "email": "tech@test.com", "password": "123456", "phone": "01798765432", "role": "TECHNICIAN" }
+```
+
+Save `customerToken` and `technicianToken` from responses.
+
+---
 
 ### Step 2 — Technician setup
 
 ```http
-PUT /api/technician/profile          (technician token)
-PUT /api/technician/availability     (technician token)
-POST /api/technician/services        (technician token)
+PUT /api/technician/profile
+Authorization: Bearer <technicianToken>
 ```
-
-### Step 3 — Customer books service
+```json
+{ "bio": "Certified plumber", "skills": ["Plumbing"], "experienceYears": 5, "hourlyRate": 500, "location": "Dhaka" }
+```
 
 ```http
-GET /api/services                    (no auth)
-POST /api/bookings                   (customer token)
+PUT /api/technician/availability
+Authorization: Bearer <technicianToken>
 ```
+```json
+{ "slots": [{ "day": "SATURDAY", "startTime": "09:00", "endTime": "18:00" }] }
+```
+
+```http
+POST /api/technician/services
+Authorization: Bearer <technicianToken>
+```
+```json
+{ "title": "Pipe Leak Repair", "description": "Fix leaks", "price": 1500, "categoryId": "<categoryId>" }
+```
+
+---
+
+### Step 3 — Customer books
+
+```http
+GET /api/services
+```
+
+```http
+POST /api/bookings
+Authorization: Bearer <customerToken>
+```
+```json
+{ "serviceId": "<serviceId>", "scheduledAt": "2026-07-10T10:00:00.000Z", "address": "House 12, Mirpur, Dhaka", "notes": "Urgent" }
+```
+
+Save `bookingId` from response.
+
+---
 
 ### Step 4 — Technician accepts
 
 ```http
-PATCH /api/technician/bookings/:bookingId
-{ "status": "ACCEPTED" }             (technician token)
+PATCH /api/technician/bookings/<bookingId>
+Authorization: Bearer <technicianToken>
 ```
+```json
+{ "status": "ACCEPTED" }
+```
+
+---
 
 ### Step 5 — Customer pays
 
 ```http
 POST /api/payments/create
-{ "bookingId": "...", "provider": "SHURJOPAY" }   (customer token)
+Authorization: Bearer <customerToken>
+```
+```json
+{ "bookingId": "<bookingId>", "provider": "SHURJOPAY" }
 ```
 
 Open `gatewayUrl` → complete sandbox payment.
 
 ```http
 POST /api/payments/confirm
-{ "paymentId": "...", "orderId": "..." }          (customer token)
+Authorization: Bearer <customerToken>
 ```
+```json
+{ "paymentId": "<paymentId>", "orderId": "<transactionId>" }
+```
+
+---
 
 ### Step 6 — Technician completes job
 
 ```http
-PATCH /api/technician/bookings/:bookingId
-{ "status": "IN_PROGRESS" }          (technician token)
-
-PATCH /api/technician/bookings/:bookingId
-{ "status": "COMPLETED" }            (technician token)
+PATCH /api/technician/bookings/<bookingId>
+Authorization: Bearer <technicianToken>
 ```
+```json
+{ "status": "IN_PROGRESS" }
+```
+
+```http
+PATCH /api/technician/bookings/<bookingId>
+Authorization: Bearer <technicianToken>
+```
+```json
+{ "status": "COMPLETED" }
+```
+
+---
 
 ### Step 7 — Customer reviews
 
 ```http
 POST /api/reviews
-{ "bookingId": "...", "rating": 5, "comment": "Great job!" }  (customer token)
+Authorization: Bearer <customerToken>
+```
+```json
+{ "bookingId": "<bookingId>", "rating": 5, "comment": "Great job!" }
 ```
 
 ---
@@ -998,15 +1809,15 @@ POST /api/reviews
 | `Customer access required` | Wrong role token | Use customer token |
 | `Technician access required` | Wrong role token | Use technician token |
 | `Booking not found` | Wrong ID or wrong customer | Check booking ID and token |
-| `Reviews can only be created for completed bookings` | Booking not `COMPLETED` | Finish the job first |
+| `Review can only be created for completed bookings` | Booking not `COMPLETED` | Finish the job first |
 | `Invalid or expired token` | Bad/expired JWT | Login again |
+| `Email is already registered` | Duplicate email on register | Use login instead |
 
 ---
 
-## Postman Collection Tips
+## Postman Tips
 
-1. Create environment variables: `baseUrl`, `customerToken`, `technicianToken`, `bookingId`, `paymentId`
-2. Set `baseUrl` = `http://localhost:5001/api`
-3. Use **Authorization → Bearer Token** tab for protected routes
-4. Use **different tokens** for customer vs technician requests
-5. After create payment, save `data.payment.id` as `paymentId` and `data.payment.transactionId` as `orderId`
+1. Set environment variable `baseUrl` = `http://localhost:5001/api`
+2. Save `customerToken`, `technicianToken`, `bookingId`, `paymentId` after each step
+3. Use **Authorization → Bearer Token** for protected routes
+4. After create payment: `paymentId` = `data.payment.id`, `orderId` = `data.payment.transactionId`
