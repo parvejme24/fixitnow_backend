@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { catchAsync } from "../../utils/catchAsync.js";
-import { bookingQuerySchema, createBookingSchema } from "./booking.interface.js";
+import { bookingQuerySchema, cancelBookingSchema, createBookingSchema } from "./booking.interface.js";
 import * as bookingService from "./booking.service.js";
 
 export const createBooking = catchAsync(async (req: Request, res: Response) => {
@@ -46,3 +46,18 @@ export const getBookingDetails = catchAsync(
         });
     }
 );
+
+export const cancelBooking = catchAsync(async (req: Request, res: Response) => {
+    const payload = cancelBookingSchema.parse(req.body);
+    const booking = await bookingService.cancelBooking(
+        req.user!.userId,
+        req.params.id as string,
+        payload
+    );
+
+    res.status(200).json({
+        success: true,
+        message: "Booking cancelled successfully",
+        data: booking,
+    });
+});

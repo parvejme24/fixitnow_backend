@@ -1,6 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../utils/AppError.js";
-import { BookingQuery, CreateBookingInput } from "./booking.interface.js";
+import { BookingQuery, CancelBookingInput, CreateBookingInput } from "./booking.interface.js";
 
 const bookingSelect = {
     id: true,
@@ -145,4 +145,40 @@ export const getBookingById = async (customerId: string, bookingId: string) => {
     }
 
     return booking;
+};
+
+const cancellableStatuses = ["REQUESTED", "ACCEPTED", "PAID"] as const;
+
+export const cancelBooking = async (
+    customerId: string,
+    bookingId: string,
+    _payload: CancelBookingInput
+) => {
+    const booking = await prisma.booking.findFirst({
+        where: {
+            id: bookingId,
+            customerId,
+        },
+    });
+
+    if (!booking) {
+        throw new AppError("Booking not found", 404);
+    }
+
+    if (
+        !cancellableStatuses.includes(
+            booking.status as (typeof cancellableStatuses)[number]
+        )
+    ) {
+        throw new AppError(
+            `Booking cannot be cancelled when status is ${booking.status}. Cancel only before IN_PROGRESS.`,
+            400
+        );
+    }
+
+    return prisma.booking.update({
+        where: { id: bookingId },
+        data: { status: "CANCELLED" },
+        select: bookingSelect,
+    });
 };

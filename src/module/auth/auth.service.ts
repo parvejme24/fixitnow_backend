@@ -4,7 +4,7 @@ import { Role } from "../../../generated/prisma/enums.js";
 import config from "../../config/index.js";
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../utils/AppError.js";
-import { JwtPayload, LoginInput, RegisterInput } from "./auth.interface.js";
+import { JwtPayload, LoginInput, RegisterInput, UpdateProfileInput } from "./auth.interface.js";
 
 const userSelect = {
     id: true,
@@ -131,4 +131,47 @@ export const getCurrentUser = async (userId: string) => {
     }
 
     return user;
+};
+
+export const updateUserProfile = async (
+    userId: string,
+    payload: UpdateProfileInput
+) => {
+    const data: {
+        name?: string;
+        phone?: string;
+        password?: string;
+    } = {};
+
+    if (payload.name !== undefined) {
+        data.name = payload.name;
+    }
+
+    if (payload.phone !== undefined) {
+        data.phone = payload.phone;
+    }
+
+    if (payload.password) {
+        data.password = await bcrypt.hash(payload.password, 12);
+    }
+
+    return prisma.user.update({
+        where: { id: userId },
+        data,
+        select: {
+            ...userSelect,
+            technicianProfile: {
+                select: {
+                    id: true,
+                    bio: true,
+                    skills: true,
+                    experienceYears: true,
+                    hourlyRate: true,
+                    location: true,
+                    avgRating: true,
+                    totalReviews: true,
+                },
+            },
+        },
+    });
 };

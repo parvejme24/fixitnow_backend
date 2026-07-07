@@ -483,22 +483,39 @@ npm run deploy:prod   # production
 
 ### Required Vercel environment variables
 
-Set these in **Vercel Dashboard → Project → Settings → Environment Variables**:
+> **Important:** Variables must be enabled for **Production** (not only Development).  
+> If only Development is checked, the live URL will fail with `Can't reach database server at 127.0.0.1:5432`.
 
-| Variable | Example | Notes |
-|----------|---------|-------|
-| `DATABASE_URL` | `postgresql://...-pooler...` | Use **pooled** Neon URL for serverless |
-| `JWT_SECRET` | `your-production-secret` | Strong random string |
-| `NODE_ENV` | `production` | |
-| `APP_URL` | `https://your-frontend.vercel.app` | Frontend URL for CORS |
-| `BACKEND_URL` | `https://fixitnow-backend-weld.vercel.app` | Your Vercel deployment URL |
-| `SP_ENDPOINT` | `https://sandbox.shurjopayment.com` | Or live endpoint |
-| `SP_USERNAME` | `sp_sandbox` | ShurjoPay credentials |
-| `SP_PASSWORD` | `your-password` | ShurjoPay credentials |
-| `SP_PREFIX` | `SP` | |
-| `SP_RETURN_URL` | `https://fixitnow-backend-weld.vercel.app/api/payments/shurjopay/callback` | Must match deployed URL |
+**Quick fix — run from project root:**
+
+```bash
+bash scripts/setup-vercel-env.sh
+npx vercel --prod
+```
+
+Or set manually in **Vercel Dashboard → Project → Settings → Environment Variables** (check **Production** + **Preview**):
+
+| Variable | Production value |
+|----------|------------------|
+| `DATABASE_URL` | Your Neon pooled connection string (same as local `.env`) |
+| `JWT_SECRET` | Strong secret key |
+| `NODE_ENV` | `production` |
+| `APP_URL` | Your frontend URL |
+| `BACKEND_URL` | `https://fixitnow-backend-weld.vercel.app` |
+| `SP_ENDPOINT` | `https://sandbox.shurjopayment.com` |
+| `SP_USERNAME` | ShurjoPay username |
+| `SP_PASSWORD` | ShurjoPay password |
+| `SP_PREFIX` | `SP` |
+| `SP_RETURN_URL` | `https://fixitnow-backend-weld.vercel.app/api/payments/shurjopay/callback` |
 
 `VERCEL_URL` is set automatically by Vercel. If `BACKEND_URL` is omitted, the app falls back to `https://<VERCEL_URL>`.
+
+**Verify after deploy:**
+
+```bash
+curl https://fixitnow-backend-weld.vercel.app/api/health
+curl https://fixitnow-backend-weld.vercel.app/api/categories
+```
 
 ### Database setup (one time)
 

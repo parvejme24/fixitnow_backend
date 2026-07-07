@@ -24,5 +24,10 @@ export const bookingQuerySchema = paginationSchema.extend({
         .optional(),
 });
 
+export const cancelBookingSchema = z.object({
+    status: z.literal("CANCELLED"),
+});
+
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type BookingQuery = z.infer<typeof bookingQuerySchema>;
+export type CancelBookingInput = z.infer<typeof cancelBookingSchema>;

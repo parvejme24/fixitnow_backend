@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import config from "../../config/index.js";
 import { catchAsync } from "../../utils/catchAsync.js";
-import { loginSchema, registerSchema } from "./auth.interface.js";
+import { loginSchema, registerSchema, updateProfileSchema } from "./auth.interface.js";
 import * as authService from "./auth.service.js";
 
 export const register = catchAsync(async (req: Request, res: Response) => {
@@ -39,6 +39,17 @@ export const getMe = catchAsync(async (req: Request, res: Response) => {
     res.status(200).json({
         success: true,
         message: "User profile fetched successfully",
+        data: user,
+    });
+});
+
+export const updateProfile = catchAsync(async (req: Request, res: Response) => {
+    const payload = updateProfileSchema.parse(req.body);
+    const user = await authService.updateUserProfile(req.user!.userId, payload);
+
+    res.status(200).json({
+        success: true,
+        message: "Profile updated successfully",
         data: user,
     });
 });

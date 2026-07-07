@@ -10,6 +10,7 @@
     "postinstall": "prisma generate",
     "vercel-build": "prisma generate",
     "prisma:generate": "prisma generate",
+    "db:seed": "tsx prisma/seed.ts",
     "deploy": "vercel",
     "deploy:prod": "vercel --prod",
     "test": "echo \"Error: no test specified\" && exit 1"
