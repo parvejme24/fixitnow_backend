@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FixItNow Backend — Project Documentation</title>
+  <style>
+    @media print { body { font-size: 11pt; } h1,h2 { page-break-after: avoid; } pre { page-break-inside: avoid; } }
+    body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 40px; color: #222; line-height: 1.6; }
+    h1 { color: #1a56db; border-bottom: 3px solid #1a56db; padding-bottom: 8px; }
+    h2 { color: #1e40af; margin-top: 2em; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+    h3 { color: #374151; margin-top: 1.5em; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.9em; }
+    td, th { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+    tr:nth-child(even) { background: #f9fafb; }
+    pre { background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 0.85em; }
+    code { font-family: 'Consolas', monospace; }
+    blockquote { border-left: 4px solid #1a56db; margin: 1em 0; padding: 8px 16px; background: #eff6ff; font-style: italic; }
+    hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+    .cover { text-align: center; padding: 60px 0; }
+    .cover h1 { font-size: 2.5em; border: none; }
+    .cover p { font-size: 1.2em; color: #666; }
+  </style>
+</head>
+<body>
+<h1>FixItNow Backend — Project Documentation</h1>
+<br>
+<p><strong>Version:</strong> 1.0.0  </p>
+<p><strong>Author:</strong> Md Parvej  </p>
+<p><strong>Date:</strong> July 2026</p>
+<br>
+<hr>
+<br>
+<h2>1. Product Purpose</h2>
+<br>
+<p><strong>FixItNow</strong> is a backend REST API for a home services marketplace platform. It connects <strong>customers</strong> who need home services (plumbing, electrical, AC repair, cleaning, etc.) with qualified <strong>technicians</strong> who offer those services.</p>
+<br>
+<h3>What the platform does</h3>
+<br>
+<p>- Customers browse services and technicians, book appointments, pay online, and leave reviews.</p>
+<p>- Technicians create service profiles, set availability, accept/decline bookings, and complete jobs.</p>
+<p>- Admins manage users, oversee all bookings, and manage service categories.</p>
+<br>
+<h3>Tagline</h3>
+<br>
+<blockquote>*"Your Trusted Home Service Platform"*</blockquote>
+<br>
+<hr>
+<br>
+<h2>2. Technology Stack</h2>
+<br>
+<tr><td>Layer</td><td>Technology</td></tr>
+<tr><td>Runtime</td><td>Node.js (ESM)</td></tr>
+<tr><td>Framework</td><td>Express 5</td></tr>
+<tr><td>Language</td><td>TypeScript</td></tr>
+<tr><td>ORM</td><td>Prisma 7</td></tr>
+<tr><td>Database</td><td>PostgreSQL (Neon)</td></tr>
+<tr><td>Validation</td><td>Zod</td></tr>
+<tr><td>Authentication</td><td>JWT + bcrypt</td></tr>
+<tr><td>Payment Gateways</td><td>ShurjoPay, SSLCommerz, Stripe</td></tr>
+<tr><td>Deployment</td><td>Vercel (Serverless)</td></tr>
+<br>
+<hr>
+<br>
+<h2>3. Project Links</h2>
+<br>
+<tr><td>Resource</td><td>URL</td></tr>
+<tr><td>**Live API**</td><td>https://fixitnow-backend-weld.vercel.app</td></tr>
+<tr><td>**API Base URL**</td><td>https://fixitnow-backend-weld.vercel.app/api</td></tr>
+<tr><td>**GitHub Repository**</td><td>https://github.com/parvejme24/fixitnow_backend</td></tr>
+<tr><td>**Health Check**</td><td>https://fixitnow-backend-weld.vercel.app/api/health</td></tr>
+<br>
+<h3>Local Development</h3>
+<br>
+<tr><td>Resource</td><td>URL</td></tr>
+<tr><td>Local API</td><td>http://localhost:5001/api</td></tr>
+<br>
+<hr>
+<br>
+<h2>4. Authentication</h2>
+<br>
+<p>Protected routes require JWT Bearer token:</p>
+<br>
+<pre><code class="">Authorization: Bearer &lt;access_token&gt;
+Content-Type: application/json
+</code></pre>
+<br>
+<tr><td>Role</td><td>Description</td></tr>
+<tr><td>PUBLIC</td><td>No token required</td></tr>
+<tr><td>CUSTOMER</td><td>Customer JWT required</td></tr>
+<tr><td>TECHNICIAN</td><td>Technician JWT required</td></tr>
+<tr><td>ADMIN</td><td>Admin JWT required</td></tr>
+<tr><td>ANY AUTH</td><td>Any valid JWT (Customer, Technician, or Admin)</td></tr>
+<br>
+<hr>
+<br>
+<h2>5. Database Tables</h2>
+<br>
+<tr><td>Table</td><td>Module</td><td>Description</td></tr>
+<tr><td>`users`</td><td>Auth</td><td>User accounts, roles, authentication</td></tr>
+<tr><td>`technician_profiles`</td><td>Technician</td><td>Technician bio, skills, rating</td></tr>
+<tr><td>`availability_slots`</td><td>Technician</td><td>Weekly availability per technician</td></tr>
+<tr><td>`categories`</td><td>Category / Admin</td><td>Service categories</td></tr>
+<tr><td>`services`</td><td>Service / Technician</td><td>Services offered by technicians</td></tr>
+<tr><td>`bookings`</td><td>Booking</td><td>Job bookings between customer & technician</td></tr>
+<tr><td>`payments`</td><td>Payment</td><td>Payment transactions</td></tr>
+<tr><td>`reviews`</td><td>Review</td><td>Customer reviews after completed jobs</td></tr>
+<br>
+<hr>
+<br>
+<h2>6. Booking Status Flow</h2>
+<br>
+<pre><code class="">REQUESTED → ACCEPTED → PAID → IN_PROGRESS → COMPLETED
+         ↘ DECLINED
+         ↘ CANCELLED (customer, before IN_PROGRESS)
+</code></pre>
+<br>
+<hr>
+<br>
+<h1>MODULE DOCUMENTATION</h1>
+<br>
+<hr>
+<br>
+<h2>Module 1: Health & Root</h2>
+<br>
+<p><strong>Related Tables:</strong> None (no database for root)</p>
+<br>
+<tr><td>#</td><td>Route Name</td><td>Method</td><td>Route</td><td>Access</td><td>Behavior</td></tr>
+<tr><td>1</td><td>Welcome</td><td>GET</td><td>`/`</td><td>Public</td><td>Returns welcome message</td></tr>
+<tr><td>2</td><td>Health Check</td><td>GET</td><td>`/api/health`</td><td>Public</td><td>Checks API and database connection</td></tr>
+<br>
+<h3>1.1 GET `/`</h3>
+<br>
+<p><strong>Access:</strong> Public</p>
+<br>
+<p><strong>Request:</strong> None</p>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="">Welcome to FixItNow API
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>1.2 GET `/api/health`</h3>
+<br>
+<p><strong>Access:</strong> Public</p>
+<br>
+<p><strong>Behavior:</strong> Verifies database connectivity.</p>
+<br>
+<p><strong>Request:</strong> None</p>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "API is healthy",
+  "data": {
+    "status": "ok",
+    "environment": "production",
+    "database": "connected",
+    "timestamp": "2026-07-07T20:43:03.651Z"
+  }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h2>Module 2: Auth</h2>
+<br>
+<p><strong>Related Tables:</strong> `users`, `technician_profiles`</p>
+<br>
+<tr><td>#</td><td>Route Name</td><td>Method</td><td>Route</td><td>Access</td><td>Behavior</td></tr>
+<tr><td>1</td><td>Register</td><td>POST</td><td>`/api/auth/register`</td><td>Public</td><td>Register customer or technician</td></tr>
+<tr><td>2</td><td>Login</td><td>POST</td><td>`/api/auth/login`</td><td>Public</td><td>Login and receive JWT</td></tr>
+<tr><td>3</td><td>Get Profile</td><td>GET</td><td>`/api/auth/me`</td><td>Any Auth</td><td>Get current user profile</td></tr>
+<tr><td>4</td><td>Update Profile</td><td>PUT</td><td>`/api/auth/profile`</td><td>Any Auth</td><td>Update name, phone, password</td></tr>
+<br>
+<hr>
+<br>
+<h3>2.1 POST `/api/auth/register`</h3>
+<br>
+<p><strong>Access:</strong> Public</p>
+<br>
+<p><strong>Behavior:</strong> Creates new user. Technicians get auto-created profile.</p>
+<br>
+<p><strong>Request Body:</strong></p>
+<pre><code class="json">{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "password123",
+  "phone": "01712345678",
+  "role": "CUSTOMER"
+}
+</code></pre>
+<br>
+<p><strong>Response (201):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "User registered successfully",
+  "data": {
+    "user": {
+      "id": "cmr85mm0800035najrx5t5wpa",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "phone": "01712345678",
+      "role": "CUSTOMER",
+      "status": "ACTIVE",
+      "createdAt": "2026-07-06T10:00:00.000Z",
+      "updatedAt": "2026-07-06T10:00:00.000Z"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>2.2 POST `/api/auth/login`</h3>
+<br>
+<p><strong>Access:</strong> Public</p>
+<br>
+<p><strong>Behavior:</strong> Authenticates user and returns JWT token.</p>
+<br>
+<p><strong>Request Body:</strong></p>
+<pre><code class="json">{
+  "email": "mdparvej@gmail.com",
+  "password": "password"
+}
+</code></pre>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Logged in successfully",
+  "data": {
+    "user": {
+      "id": "cmr85mm0800035najrx5t5wpa",
+      "name": "Admin",
+      "email": "mdparvej@gmail.com",
+      "role": "ADMIN",
+      "status": "ACTIVE"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>2.3 GET `/api/auth/me`</h3>
+<br>
+<p><strong>Access:</strong> Any Auth (Bearer token)</p>
+<br>
+<p><strong>Behavior:</strong> Returns authenticated user's profile.</p>
+<br>
+<p><strong>Request:</strong> None (Bearer token in header)</p>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "User profile fetched successfully",
+  "data": {
+    "id": "cmr85mm0800035najrx5t5wpa",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "01712345678",
+    "role": "CUSTOMER",
+    "status": "ACTIVE",
+    "technicianProfile": null
+  }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>2.4 PUT `/api/auth/profile`</h3>
+<br>
+<p><strong>Access:</strong> Any Auth (Bearer token)</p>
+<br>
+<p><strong>Behavior:</strong> Updates user name, phone, and/or password.</p>
+<br>
+<p><strong>Request Body:</strong></p>
+<pre><code class="json">{
+  "name": "Updated Name",
+  "phone": "01798765432",
+  "password": "newpassword123"
+}
+</code></pre>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Profile updated successfully",
+  "data": {
+    "id": "cmr85mm0800035najrx5t5wpa",
+    "name": "Updated Name",
+    "email": "john@example.com",
+    "phone": "01798765432",
+    "role": "CUSTOMER",
+    "status": "ACTIVE"
+  }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h2>Module 3: Category (Public)</h2>
+<br>
+<p><strong>Related Tables:</strong> `categories`</p>
+<br>
+<tr><td>#</td><td>Route Name</td><td>Method</td><td>Route</td><td>Access</td><td>Behavior</td></tr>
+<tr><td>1</td><td>List Categories</td><td>GET</td><td>`/api/categories`</td><td>Public</td><td>Get all service categories</td></tr>
+<br>
+<hr>
+<br>
+<h3>3.1 GET `/api/categories`</h3>
+<br>
+<p><strong>Access:</strong> Public</p>
+<br>
+<p><strong>Behavior:</strong> Returns all service categories.</p>
+<br>
+<p><strong>Request:</strong> None</p>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Categories fetched successfully",
+  "data": [
+    {
+      "id": "cmr86u1b70001f4aj2pmb0n6n",
+      "name": "Plumbing",
+      "description": "Pipe and water related services",
+      "icon": "🔧",
+      "createdAt": "2026-07-05T10:00:00.000Z"
+    }
+  ]
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h2>Module 4: Service (Public)</h2>
+<br>
+<p><strong>Related Tables:</strong> `services`, `categories`, `technician_profiles`, `users`</p>
+<br>
+<tr><td>#</td><td>Route Name</td><td>Method</td><td>Route</td><td>Access</td><td>Behavior</td></tr>
+<tr><td>1</td><td>List Services</td><td>GET</td><td>`/api/services`</td><td>Public</td><td>Get services with filters</td></tr>
+<br>
+<hr>
+<br>
+<h3>4.1 GET `/api/services`</h3>
+<br>
+<p><strong>Access:</strong> Public</p>
+<br>
+<p><strong>Behavior:</strong> Lists active services with pagination and filters.</p>
+<br>
+<p><strong>Query Parameters:</strong> `page`, `limit`, `categoryId`, `location`, `minRating`, `minPrice`, `maxPrice`, `search`</p>
+<br>
+<p><strong>Example:</strong> `GET /api/services?page=1&limit=10&categoryId=abc&minPrice=500`</p>
+<br>
+<p><strong>Request:</strong> None</p>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Services fetched successfully",
+  "meta": { "page": 1, "limit": 10, "total": 5, "totalPages": 1 },
+  "data": [
+    {
+      "id": "cmr8cd3fw00039pajy6j2qabf",
+      "title": "Pipe Leak Repair",
+      "description": "Fix leaking pipes",
+      "price": 1500,
+      "isActive": true,
+      "category": { "id": "...", "name": "Plumbing", "icon": "🔧" },
+      "technician": {
+        "id": "cmr87xylm0000gnajs79t2v38",
+        "location": "Dhaka",
+        "avgRating": 4.5,
+        "user": { "id": "...", "name": "Md Parvej" }
+      }
+    }
+  ]
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h2>Module 5: Technician (Public)</h2>
+<br>
+<p><strong>Related Tables:</strong> `technician_profiles`, `users`, `services`, `availability_slots`, `reviews`</p>
+<br>
+<tr><td>#</td><td>Route Name</td><td>Method</td><td>Route</td><td>Access</td><td>Behavior</td></tr>
+<tr><td>1</td><td>List Technicians</td><td>GET</td><td>`/api/technicians`</td><td>Public</td><td>Get all technicians with filters</td></tr>
+<tr><td>2</td><td>Technician Profile</td><td>GET</td><td>`/api/technicians/:id`</td><td>Public</td><td>Get technician details, services, reviews</td></tr>
+<br>
+<hr>
+<br>
+<h3>5.1 GET `/api/technicians`</h3>
+<br>
+<p><strong>Access:</strong> Public</p>
+<br>
+<p><strong>Query Parameters:</strong> `page`, `limit`, `location`, `minRating`, `categoryId`, `search`</p>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Technicians fetched successfully",
+  "meta": { "page": 1, "limit": 10, "total": 3, "totalPages": 1 },
+  "data": [
+    {
+      "id": "cmr87xylm0000gnajs79t2v38",
+      "bio": "Certified plumber",
+      "skills": ["Plumbing", "Pipe fitting"],
+      "experienceYears": 5,
+      "hourlyRate": 500,
+      "location": "Dhaka",
+      "avgRating": 4.5,
+      "totalReviews": 12,
+      "user": { "id": "...", "name": "Md Parvej", "phone": "017..." }
+    }
+  ]
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>5.2 GET `/api/technicians/:id`</h3>
+<br>
+<p><strong>Access:</strong> Public</p>
+<br>
+<p><strong>Behavior:</strong> Full technician profile with services, availability, and reviews.</p>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Technician profile fetched successfully",
+  "data": {
+    "id": "cmr87xylm0000gnajs79t2v38",
+    "bio": "Certified plumber with 5 years experience",
+    "skills": ["Plumbing"],
+    "avgRating": 4.5,
+    "user": { "name": "Md Parvej", "email": "tech@example.com" },
+    "services": [{ "title": "Pipe Leak Repair", "price": 1500 }],
+    "availability": [{ "day": "SATURDAY", "startTime": "09:00", "endTime": "18:00" }],
+    "reviews": [{ "rating": 5, "comment": "Great work!" }]
+  }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h2>Module 6: Booking (Customer)</h2>
+<br>
+<p><strong>Related Tables:</strong> `bookings`, `services`, `technician_profiles`, `users`, `payments`, `reviews`</p>
+<br>
+<tr><td>#</td><td>Route Name</td><td>Method</td><td>Route</td><td>Access</td><td>Behavior</td></tr>
+<tr><td>1</td><td>Create Booking</td><td>POST</td><td>`/api/bookings`</td><td>Customer</td><td>Create new booking</td></tr>
+<tr><td>2</td><td>List Bookings</td><td>GET</td><td>`/api/bookings`</td><td>Customer</td><td>Get customer's bookings</td></tr>
+<tr><td>3</td><td>Booking Details</td><td>GET</td><td>`/api/bookings/:id`</td><td>Customer</td><td>Get single booking</td></tr>
+<tr><td>4</td><td>Cancel Booking</td><td>PATCH</td><td>`/api/bookings/:id`</td><td>Customer</td><td>Cancel before IN_PROGRESS</td></tr>
+<br>
+<hr>
+<br>
+<h3>6.1 POST `/api/bookings`</h3>
+<br>
+<p><strong>Access:</strong> Customer</p>
+<br>
+<p><strong>Behavior:</strong> Creates booking with status REQUESTED.</p>
+<br>
+<p><strong>Request Body:</strong></p>
+<pre><code class="json">{
+  "serviceId": "cmr8cd3fw00039pajy6j2qabf",
+  "scheduledAt": "2026-07-10T10:00:00.000Z",
+  "address": "House 12, Road 5, Mirpur 10, Dhaka",
+  "notes": "Kitchen sink is leaking"
+}
+</code></pre>
+<br>
+<p><strong>Response (201):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Booking created successfully",
+  "data": {
+    "id": "cmr9jqeun0000c8ajp13sb43v",
+    "status": "REQUESTED",
+    "scheduledAt": "2026-07-10T10:00:00.000Z",
+    "address": "House 12, Road 5, Mirpur 10, Dhaka",
+    "service": { "title": "Pipe Leak Repair", "price": 1500 },
+    "technician": { "user": { "name": "Md Parvej" } }
+  }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>6.2 GET `/api/bookings`</h3>
+<br>
+<p><strong>Access:</strong> Customer</p>
+<br>
+<p><strong>Query:</strong> `page`, `limit`, `status`</p>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Bookings fetched successfully",
+  "meta": { "page": 1, "limit": 10, "total": 2, "totalPages": 1 },
+  "data": [{ "id": "...", "status": "ACCEPTED", "service": { "title": "..." } }]
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>6.3 GET `/api/bookings/:id`</h3>
+<br>
+<p><strong>Access:</strong> Customer</p>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Booking details fetched successfully",
+  "data": {
+    "id": "cmr9jqeun0000c8ajp13sb43v",
+    "status": "PAID",
+    "payment": { "status": "COMPLETED", "amount": 1500 },
+    "review": null
+  }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>6.4 PATCH `/api/bookings/:id`</h3>
+<br>
+<p><strong>Access:</strong> Customer</p>
+<br>
+<p><strong>Behavior:</strong> Cancel booking (status must be REQUESTED, ACCEPTED, or PAID).</p>
+<br>
+<p><strong>Request Body:</strong></p>
+<pre><code class="json">{
+  "status": "CANCELLED"
+}
+</code></pre>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Booking cancelled successfully",
+  "data": {
+    "id": "cmr9jqeun0000c8ajp13sb43v",
+    "status": "CANCELLED"
+  }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h2>Module 7: Payment</h2>
+<br>
+<p><strong>Related Tables:</strong> `payments`, `bookings`</p>
+<br>
+<tr><td>#</td><td>Route Name</td><td>Method</td><td>Route</td><td>Access</td><td>Behavior</td></tr>
+<tr><td>1</td><td>ShurjoPay Callback</td><td>GET/POST</td><td>`/api/payments/shurjopay/callback`</td><td>Public</td><td>Payment gateway callback</td></tr>
+<tr><td>2</td><td>Create Payment</td><td>POST</td><td>`/api/payments/create`</td><td>Customer</td><td>Start payment session</td></tr>
+<tr><td>3</td><td>Confirm Payment</td><td>POST</td><td>`/api/payments/confirm`</td><td>Customer</td><td>Confirm payment after gateway</td></tr>
+<tr><td>4</td><td>List Payments</td><td>GET</td><td>`/api/payments`</td><td>Customer</td><td>Payment history</td></tr>
+<tr><td>5</td><td>Payment Details</td><td>GET</td><td>`/api/payments/:id`</td><td>Customer</td><td>Single payment details</td></tr>
+<br>
+<hr>
+<br>
+<h3>7.1 POST `/api/payments/create`</h3>
+<br>
+<p><strong>Access:</strong> Customer</p>
+<br>
+<p><strong>Behavior:</strong> Creates payment session. Booking must be ACCEPTED.</p>
+<br>
+<p><strong>Request Body:</strong></p>
+<pre><code class="json">{
+  "bookingId": "cmr9jqeun0000c8ajp13sb43v",
+  "provider": "SHURJOPAY"
+}
+</code></pre>
+<br>
+<p><strong>Providers:</strong> `SHURJOPAY`, `SSLCOMMERZ`, `STRIPE`</p>
+<br>
+<p><strong>Response (201):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Payment session created successfully",
+  "data": {
+    "payment": {
+      "id": "cmr9kfsv30000oaajgvhfdrno",
+      "transactionId": "SP1783363257829",
+      "amount": 1500,
+      "status": "PENDING",
+      "provider": "SHURJOPAY"
+    },
+    "gatewayUrl": "https://sandbox.securepay.shurjopayment.com/...",
+    "sessionId": null
+  }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>7.2 POST `/api/payments/confirm`</h3>
+<br>
+<p><strong>Access:</strong> Customer</p>
+<br>
+<p><strong>Request Body (ShurjoPay):</strong></p>
+<pre><code class="json">{
+  "paymentId": "cmr9kfsv30000oaajgvhfdrno",
+  "orderId": "SP1783363257829"
+}
+</code></pre>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Payment confirmed successfully",
+  "data": {
+    "id": "cmr9kfsv30000oaajgvhfdrno",
+    "status": "COMPLETED",
+    "paidAt": "2026-07-06T18:45:00.000Z",
+    "booking": { "status": "PAID" }
+  }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>7.3 GET `/api/payments`</h3>
+<br>
+<p><strong>Access:</strong> Customer</p>
+<br>
+<p><strong>Query:</strong> `page`, `limit`, `status`</p>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Payments fetched successfully",
+  "meta": { "page": 1, "limit": 10, "total": 1, "totalPages": 1 },
+  "data": [{ "id": "...", "status": "COMPLETED", "amount": 1500 }]
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>7.4 GET `/api/payments/:id`</h3>
+<br>
+<p><strong>Access:</strong> Customer</p>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Payment details fetched successfully",
+  "data": {
+    "id": "cmr9kfsv30000oaajgvhfdrno",
+    "transactionId": "SP1783363257829",
+    "status": "COMPLETED",
+    "amount": 1500,
+    "provider": "SHURJOPAY"
+  }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h2>Module 8: Review (Customer)</h2>
+<br>
+<p><strong>Related Tables:</strong> `reviews`, `bookings`, `technician_profiles`</p>
+<br>
+<tr><td>#</td><td>Route Name</td><td>Method</td><td>Route</td><td>Access</td><td>Behavior</td></tr>
+<tr><td>1</td><td>Create Review</td><td>POST</td><td>`/api/reviews`</td><td>Customer</td><td>Review after COMPLETED booking</td></tr>
+<br>
+<hr>
+<br>
+<h3>8.1 POST `/api/reviews`</h3>
+<br>
+<p><strong>Access:</strong> Customer</p>
+<br>
+<p><strong>Behavior:</strong> Creates review. Booking must be COMPLETED. Updates technician rating.</p>
+<br>
+<p><strong>Request Body:</strong></p>
+<pre><code class="json">{
+  "bookingId": "cmr9jqeun0000c8ajp13sb43v",
+  "rating": 5,
+  "comment": "Excellent work, very professional!"
+}
+</code></pre>
+<br>
+<p><strong>Response (201):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Review created successfully",
+  "data": {
+    "id": "cmr9review001",
+    "rating": 5,
+    "comment": "Excellent work, very professional!",
+    "technician": { "avgRating": 4.6, "totalReviews": 13 }
+  }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h2>Module 9: Technician Management</h2>
+<br>
+<p><strong>Related Tables:</strong> `technician_profiles`, `availability_slots`, `services`, `bookings`, `categories`</p>
+<br>
+<tr><td>#</td><td>Route Name</td><td>Method</td><td>Route</td><td>Access</td><td>Behavior</td></tr>
+<tr><td>1</td><td>Update Profile</td><td>PUT</td><td>`/api/technician/profile`</td><td>Technician</td><td>Update bio, skills, location</td></tr>
+<tr><td>2</td><td>Update Availability</td><td>PUT</td><td>`/api/technician/availability`</td><td>Technician</td><td>Set weekly time slots</td></tr>
+<tr><td>3</td><td>List Services</td><td>GET</td><td>`/api/technician/services`</td><td>Technician</td><td>Get own services</td></tr>
+<tr><td>4</td><td>Create Service</td><td>POST</td><td>`/api/technician/services`</td><td>Technician</td><td>Add new service</td></tr>
+<tr><td>5</td><td>Update Service</td><td>PATCH</td><td>`/api/technician/services/:id`</td><td>Technician</td><td>Update service</td></tr>
+<tr><td>6</td><td>Delete Service</td><td>DELETE</td><td>`/api/technician/services/:id`</td><td>Technician</td><td>Delete service</td></tr>
+<tr><td>7</td><td>List Bookings</td><td>GET</td><td>`/api/technician/bookings`</td><td>Technician</td><td>Get assigned bookings</td></tr>
+<tr><td>8</td><td>Update Booking Status</td><td>PATCH</td><td>`/api/technician/bookings/:id`</td><td>Technician</td><td>Accept/decline/complete</td></tr>
+<br>
+<hr>
+<br>
+<h3>9.1 PUT `/api/technician/profile`</h3>
+<br>
+<p><strong>Request Body:</strong></p>
+<pre><code class="json">{
+  "bio": "Certified plumber with 5 years experience",
+  "skills": ["Plumbing", "Pipe fitting"],
+  "experienceYears": 5,
+  "hourlyRate": 500,
+  "location": "Dhaka, Mirpur"
+}
+</code></pre>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Technician profile updated successfully",
+  "data": { "id": "...", "bio": "...", "location": "Dhaka, Mirpur" }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>9.2 PUT `/api/technician/availability`</h3>
+<br>
+<p><strong>Request Body:</strong></p>
+<pre><code class="json">{
+  "slots": [
+    { "day": "SATURDAY", "startTime": "09:00", "endTime": "18:00" },
+    { "day": "MONDAY", "startTime": "09:00", "endTime": "18:00" }
+  ]
+}
+</code></pre>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Availability updated successfully",
+  "data": { "availability": [{ "day": "SATURDAY", "startTime": "09:00", "endTime": "18:00" }] }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>9.3 POST `/api/technician/services`</h3>
+<br>
+<p><strong>Request Body:</strong></p>
+<pre><code class="json">{
+  "title": "Pipe Leak Repair",
+  "description": "Fix leaking pipes",
+  "price": 1500,
+  "categoryId": "cmr86u1b70001f4aj2pmb0n6n"
+}
+</code></pre>
+<br>
+<p><strong>Response (201):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Service created successfully",
+  "data": { "id": "...", "title": "Pipe Leak Repair", "price": 1500 }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>9.4 PATCH `/api/technician/bookings/:id`</h3>
+<br>
+<p><strong>Request Body (Accept):</strong></p>
+<pre><code class="json">{ "status": "ACCEPTED" }
+</code></pre>
+<br>
+<p><strong>Allowed transitions:</strong></p>
+<p>- REQUESTED → ACCEPTED, DECLINED</p>
+<p>- PAID → IN_PROGRESS</p>
+<p>- IN_PROGRESS → COMPLETED</p>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Booking status updated successfully",
+  "data": { "id": "...", "status": "ACCEPTED" }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h2>Module 10: Admin</h2>
+<br>
+<p><strong>Related Tables:</strong> `users`, `bookings`, `categories`, `services`, `payments`</p>
+<br>
+<tr><td>#</td><td>Route Name</td><td>Method</td><td>Route</td><td>Access</td><td>Behavior</td></tr>
+<tr><td>1</td><td>List Users</td><td>GET</td><td>`/api/admin/users`</td><td>Admin</td><td>Get all users</td></tr>
+<tr><td>2</td><td>Update User Status</td><td>PATCH</td><td>`/api/admin/users/:id`</td><td>Admin</td><td>Ban/unban user</td></tr>
+<tr><td>3</td><td>List Bookings</td><td>GET</td><td>`/api/admin/bookings`</td><td>Admin</td><td>Get all bookings</td></tr>
+<tr><td>4</td><td>List Categories</td><td>GET</td><td>`/api/admin/categories`</td><td>Admin</td><td>Get categories</td></tr>
+<tr><td>5</td><td>Create Category</td><td>POST</td><td>`/api/admin/categories`</td><td>Admin</td><td>Create category</td></tr>
+<tr><td>6</td><td>Update Category</td><td>PATCH</td><td>`/api/admin/categories/:id`</td><td>Admin</td><td>Update category</td></tr>
+<tr><td>7</td><td>Delete Category</td><td>DELETE</td><td>`/api/admin/categories/:id`</td><td>Admin</td><td>Delete category</td></tr>
+<br>
+<hr>
+<br>
+<h3>10.1 GET `/api/admin/users`</h3>
+<br>
+<p><strong>Query:</strong> `page`, `limit`, `role`, `status`, `search`</p>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Users fetched successfully",
+  "meta": { "page": 1, "limit": 10, "total": 10, "totalPages": 1 },
+  "data": [
+    {
+      "id": "...",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "role": "CUSTOMER",
+      "status": "ACTIVE"
+    }
+  ]
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>10.2 PATCH `/api/admin/users/:id`</h3>
+<br>
+<p><strong>Request Body:</strong></p>
+<pre><code class="json">{ "status": "BANNED" }
+</code></pre>
+<br>
+<p><strong>Response (200):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "User status updated successfully",
+  "data": { "id": "...", "status": "BANNED" }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h3>10.3 POST `/api/admin/categories`</h3>
+<br>
+<p><strong>Request Body:</strong></p>
+<pre><code class="json">{
+  "name": "Plumbing",
+  "description": "Water and pipe services",
+  "icon": "🔧"
+}
+</code></pre>
+<br>
+<p><strong>Response (201):</strong></p>
+<pre><code class="json">{
+  "success": true,
+  "message": "Category created successfully",
+  "data": { "id": "...", "name": "Plumbing", "icon": "🔧" }
+}
+</code></pre>
+<br>
+<hr>
+<br>
+<h2>7. Standard Response Format</h2>
+<br>
+<p><strong>Success:</strong></p>
+<pre><code class="json">{ "success": true, "message": "...", "data": {} }
+</code></pre>
+<br>
+<p><strong>Error:</strong></p>
+<pre><code class="json">{ "success": false, "message": "Error description" }
+</code></pre>
+<br>
+<hr>
+<br>
+<h2>8. Admin Login Credentials</h2>
+<br>
+<tr><td>Field</td><td>Value</td></tr>
+<tr><td>Email</td><td>mdparvej@gmail.com</td></tr>
+<tr><td>Password</td><td>password</td></tr>
+<br>
+<p>Run `npm run db:seed` to create admin user in database.</p>
+<br>
+<hr>
+<br>
+<h2>9. Total API Summary</h2>
+<br>
+<tr><td>Module</td><td>Routes</td></tr>
+<tr><td>Health & Root</td><td>2</td></tr>
+<tr><td>Auth</td><td>4</td></tr>
+<tr><td>Category</td><td>1</td></tr>
+<tr><td>Service</td><td>1</td></tr>
+<tr><td>Technician (Public)</td><td>2</td></tr>
+<tr><td>Booking</td><td>4</td></tr>
+<tr><td>Payment</td><td>5</td></tr>
+<tr><td>Review</td><td>1</td></tr>
+<tr><td>Technician Management</td><td>8</td></tr>
+<tr><td>Admin</td><td>7</td></tr>
+<tr><td>**Total**</td><td>**35**</td></tr>
+<br>
+<hr>
+<br>
+<p>*FixItNow Backend — Project Documentation v1.0.0*</p>
+<br>
+
+</body>
+</html>

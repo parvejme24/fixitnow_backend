@@ -351,7 +351,12 @@ GET /api/payments/shurjopay/callback?order_id=<transactionId>
 
 Full endpoint reference with request/response examples:
 
-**[docs/API.md](./docs/API.md)**
+- **[docs/API.md](./docs/API.md)** — API reference
+- **[docs/PROJECT_DOCUMENTATION.md](./docs/PROJECT_DOCUMENTATION.md)** — Full project documentation (submission)
+- **[docs/PROJECT_DOCUMENTATION.html](./docs/PROJECT_DOCUMENTATION.html)** — Print-ready (export to PDF)
+
+**Export to PDF:** Open `docs/PROJECT_DOCUMENTATION.html` in Chrome → Print → Save as PDF  
+**Export to DOCX:** Open `docs/PROJECT_DOCUMENTATION.md` in Microsoft Word → Save As → `.docx`
 
 ### Quick endpoint overview
 
