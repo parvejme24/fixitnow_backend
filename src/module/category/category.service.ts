@@ -5,34 +5,79 @@ import { CreateCategoryInput, UpdateCategoryInput } from "./category.interface.j
 const categorySelect = {
     id: true,
     name: true,
-    description: true,
-    icon: true,
+    slug: true,
+    sortOrder: true,
+    jobsDone: true,
     createdAt: true,
 };
 
 export const getAllCategories = async () => {
-    return prisma.category.findMany({
+    const categories = await prisma.category.findMany({
         select: {
             ...categorySelect,
             _count: {
                 select: {
-                    services: {
-                        where: { isActive: true },
-                    },
+                    services: { where: { isActive: true } },
+                    technicianCategories: true,
                 },
             },
+        },
+        orderBy: { sortOrder: "asc" },
+    });
+
+    return categories.map(({ _count, ...category }) => ({
+        ...category,
+        serviceCount: _count.services,
+        technicianCount: _count.technicianCategories,
+    }));
+};
+
+export const getCategoryById = async (id: string) => {
+    const category = await prisma.category.findUnique({
+        where: { id },
+        select: {
+            ...categorySelect,
+            _count: {
+                select: {
+                    services: { where: { isActive: true } },
+                    technicianCategories: true,
+                },
+            },
+        },
+    });
+
+    if (!category) {
+        throw new AppError("Category not found", 404);
+    }
+
+    const { _count, ...rest } = category;
+    return {
+        ...rest,
+        serviceCount: _count.services,
+        technicianCount: _count.technicianCategories,
+    };
+};
+
+export const getAllAreas = async () => {
+    return prisma.area.findMany({
+        select: {
+            id: true,
+            name: true,
+            _count: { select: { technicians: true } },
         },
         orderBy: { name: "asc" },
     });
 };
 
 export const createCategory = async (payload: CreateCategoryInput) => {
-    const existingCategory = await prisma.category.findUnique({
-        where: { name: payload.name },
+    const existingCategory = await prisma.category.findFirst({
+        where: {
+            OR: [{ id: payload.id }, { name: payload.name }, { slug: payload.slug }],
+        },
     });
 
     if (existingCategory) {
-        throw new AppError("Category with this name already exists", 409);
+        throw new AppError("Category with this id, name or slug already exists", 409);
     }
 
     return prisma.category.create({
@@ -57,6 +102,16 @@ export const updateCategory = async (id: string, payload: UpdateCategoryInput) =
 
         if (existingCategory) {
             throw new AppError("Category with this name already exists", 409);
+        }
+    }
+
+    if (payload.slug && payload.slug !== category.slug) {
+        const existingSlug = await prisma.category.findUnique({
+            where: { slug: payload.slug },
+        });
+
+        if (existingSlug) {
+            throw new AppError("Category with this slug already exists", 409);
         }
     }
 

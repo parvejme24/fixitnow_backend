@@ -9,6 +9,7 @@ import {
 import {
     getBookings,
     getCategories,
+    getStats,
     getUsers,
     updateUserStatus,
 } from "./admin.controller.js";
@@ -17,6 +18,7 @@ const router = Router();
 
 router.use(authenticate, requireAdmin);
 
+router.get("/stats", getStats);
 router.get("/users", getUsers);
 router.patch("/users/:id", updateUserStatus);
 router.get("/bookings", getBookings);

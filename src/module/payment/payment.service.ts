@@ -1,44 +1,29 @@
-import { Prisma } from "../../../generated/prisma/client.js";
-import config from "../../config/index.js";
 import { prisma } from "../../lib/prisma.js";
-import {
-    createStripeCheckoutSession,
-    generateTransactionId,
-    initSSLCommerzPayment,
-    isDevPaymentMode,
-    validateSSLCommerzPayment,
-    validateStripeSession,
-} from "../../lib/paymentGateway.js";
-import {
-    generateShurjoOrderId,
-    initShurjoPayPayment,
-    verifyShurjoPayPayment,
-} from "../../lib/shurjoPay.js";
+import config from "../../config/index.js";
 import { AppError } from "../../utils/AppError.js";
 import {
-    ConfirmPaymentInput,
-    CreatePaymentInput,
-    PaymentQuery,
+    InitiatePaymentInput,
+    WebhookPaymentInput,
 } from "./payment.interface.js";
 
 const paymentSelect = {
     id: true,
-    transactionId: true,
     bookingId: true,
+    userId: true,
     amount: true,
-    currency: true,
     method: true,
-    provider: true,
     status: true,
+    providerTxnId: true,
     paidAt: true,
+    failedAt: true,
     createdAt: true,
     updatedAt: true,
     booking: {
         select: {
             id: true,
+            refCode: true,
             status: true,
             scheduledAt: true,
-            address: true,
             service: {
                 select: {
                     id: true,
@@ -61,85 +46,21 @@ const paymentSelect = {
     },
 };
 
-const completePayment = async (
-    paymentId: string,
-    gatewayData: Record<string, unknown>,
-    method?: string
-) => {
-    return prisma.$transaction(async (tx) => {
-        const payment = await tx.payment.findUniqueOrThrow({
-            where: { id: paymentId },
-        });
-
-        if (payment.status === "COMPLETED") {
-            return tx.payment.findUniqueOrThrow({
-                where: { id: paymentId },
-                select: paymentSelect,
-            });
-        }
-
-        const updatedPayment = await tx.payment.update({
-            where: { id: paymentId },
-            data: {
-                status: "COMPLETED",
-                method,
-                gatewayData: gatewayData as Prisma.InputJsonValue,
-                paidAt: new Date(),
-            },
-            select: paymentSelect,
-        });
-
-        await tx.booking.update({
-            where: { id: payment.bookingId },
-            data: { status: "PAID" },
-        });
-
-        return updatedPayment;
-    });
+const generateProviderTxnId = () => {
+    const random = Math.random().toString(36).substring(2, 10).toUpperCase();
+    return `TXN-${Date.now()}-${random}`;
 };
 
-const verifyAndCompleteShurjoPayment = async (
-    paymentId: string,
-    orderId: string
-) => {
-    const verification = await verifyShurjoPayPayment(orderId);
-
-    if (verification.sp_code !== 1000) {
-        await prisma.payment.update({
-            where: { id: paymentId },
-            data: {
-                status: verification.sp_code === 1002 ? "CANCELLED" : "FAILED",
-                gatewayData: verification as unknown as Prisma.InputJsonValue,
-            },
-        });
-
-        throw new AppError(
-            verification.sp_message || "ShurjoPay payment failed",
-            400
-        );
-    }
-
-    return completePayment(
-        paymentId,
-        verification as unknown as Record<string, unknown>,
-        verification.method || "ShurjoPay"
-    );
-};
-
-export const createPayment = async (
+export const initiatePayment = async (
     customerId: string,
-    payload: CreatePaymentInput
+    payload: InitiatePaymentInput
 ) => {
     const booking = await prisma.booking.findFirst({
         where: {
-            id: payload.bookingId,
+            OR: [{ id: payload.bookingId }, { refCode: payload.bookingId }],
             customerId,
         },
-        include: {
-            service: true,
-            customer: true,
-            payment: true,
-        },
+        include: { payment: true },
     });
 
     if (!booking) {
@@ -148,271 +69,103 @@ export const createPayment = async (
 
     if (booking.status !== "ACCEPTED") {
         throw new AppError(
-            `Payment can only be created for accepted bookings. Current status: ${booking.status}. Ask the technician to accept the booking first.`,
+            `Payment can only be initiated for ACCEPTED bookings. Current: ${booking.status}`,
             400
         );
     }
 
-    if (booking.payment?.status === "COMPLETED") {
+    if (booking.payment?.status === "SUCCESS") {
         throw new AppError("Booking is already paid", 400);
-    }
-
-    const amount = booking.service.price;
-    let transactionId = generateTransactionId();
-    let gatewayResponse: Record<string, unknown> = {};
-    let gatewayUrl: string | null = null;
-    let sessionId: string | null = null;
-
-    if (payload.provider === "SHURJOPAY") {
-        transactionId = generateShurjoOrderId();
-
-        const pendingPayment = await prisma.payment.upsert({
-            where: { bookingId: booking.id },
-            update: {
-                transactionId,
-                amount,
-                provider: "SHURJOPAY",
-                currency: "BDT",
-                status: "PENDING",
-                paidAt: null,
-            },
-            create: {
-                transactionId,
-                bookingId: booking.id,
-                amount,
-                currency: "BDT",
-                provider: "SHURJOPAY",
-                status: "PENDING",
-            },
-            select: paymentSelect,
-        });
-
-        const response = await initShurjoPayPayment({
-            orderId: transactionId,
-            amount,
-            customerName: booking.customer.name,
-            customerEmail: booking.customer.email,
-            customerPhone: booking.customer.phone || "01700000000",
-            customerAddress: booking.address,
-            paymentId: pendingPayment.id,
-            bookingId: booking.id,
-        });
-
-        gatewayResponse = response as unknown as Record<string, unknown>;
-        gatewayUrl = response.checkout_url || null;
-
-        const payment = await prisma.payment.update({
-            where: { id: pendingPayment.id },
-            data: {
-                gatewayData: gatewayResponse as Prisma.InputJsonValue,
-            },
-            select: paymentSelect,
-        });
-
-        return { payment, gatewayUrl, sessionId };
-    }
-
-    if (payload.provider === "SSLCOMMERZ") {
-        try {
-            gatewayResponse = await initSSLCommerzPayment({
-                transactionId,
-                amount,
-                currency: "BDT",
-                productName: booking.service.title,
-                customerName: booking.customer.name,
-                customerEmail: booking.customer.email,
-                customerPhone: booking.customer.phone || "01700000000",
-                customerAddress: booking.address,
-            });
-            gatewayUrl = (gatewayResponse.GatewayPageURL as string) || null;
-        } catch (error) {
-            if (!isDevPaymentMode()) {
-                throw error;
-            }
-
-            gatewayResponse = {
-                GatewayPageURL: `${config.backend_url}/api/payments/dev-mock?transactionId=${transactionId}`,
-                status: "DEV_MOCK",
-            };
-            gatewayUrl = gatewayResponse.GatewayPageURL as string;
-        }
-    } else {
-        try {
-            const session = await createStripeCheckoutSession({
-                transactionId,
-                amount,
-                currency: "usd",
-                productName: booking.service.title,
-                customerEmail: booking.customer.email,
-            });
-
-            gatewayResponse = {
-                sessionId: session.id,
-                GatewayPageURL: session.url,
-            };
-            gatewayUrl = session.url;
-            sessionId = session.id;
-        } catch (error) {
-            if (!isDevPaymentMode()) {
-                throw error;
-            }
-
-            gatewayResponse = {
-                sessionId: `dev_session_${transactionId}`,
-                GatewayPageURL: `${config.backend_url}/api/payments/dev-mock?transactionId=${transactionId}`,
-                status: "DEV_MOCK",
-            };
-            gatewayUrl = gatewayResponse.GatewayPageURL as string;
-            sessionId = gatewayResponse.sessionId as string;
-        }
     }
 
     const payment = await prisma.payment.upsert({
         where: { bookingId: booking.id },
         update: {
-            transactionId,
-            amount,
-            provider: payload.provider,
+            amount: booking.totalAmount,
+            method: payload.method,
             status: "PENDING",
-            gatewayData: gatewayResponse as Prisma.InputJsonValue,
             paidAt: null,
+            failedAt: null,
         },
         create: {
-            transactionId,
             bookingId: booking.id,
-            amount,
-            currency: payload.provider === "STRIPE" ? "USD" : "BDT",
-            provider: payload.provider,
+            userId: customerId,
+            amount: booking.totalAmount,
+            method: payload.method,
             status: "PENDING",
-            gatewayData: gatewayResponse as Prisma.InputJsonValue,
         },
         select: paymentSelect,
     });
 
-    return { payment, gatewayUrl, sessionId };
+    return {
+        payment,
+        redirect: {
+            successUrl: `${config.app_url}/payment/success?paymentId=${payment.id}`,
+            cancelUrl: `${config.app_url}/payment/cancel?paymentId=${payment.id}`,
+        },
+    };
 };
 
-export const confirmPayment = async (
-    customerId: string,
-    payload: ConfirmPaymentInput
-) => {
-    const payment = await prisma.payment.findFirst({
-        where: {
-            id: payload.paymentId,
-            booking: { customerId },
-        },
+export const handlePaymentWebhook = async (payload: WebhookPaymentInput) => {
+    const payment = await prisma.payment.findUnique({
+        where: { id: payload.paymentId },
     });
 
     if (!payment) {
         throw new AppError("Payment not found", 404);
     }
 
-    if (payment.status === "COMPLETED") {
+    if (payment.status === "SUCCESS" && payload.status === "SUCCESS") {
         return prisma.payment.findUniqueOrThrow({
             where: { id: payment.id },
             select: paymentSelect,
         });
     }
 
-    if (payment.provider === "SHURJOPAY") {
-        const orderId = payload.orderId || payment.transactionId;
-        return verifyAndCompleteShurjoPayment(payment.id, orderId);
+    if (payload.status === "SUCCESS") {
+        return prisma.$transaction(async (tx) => {
+            const updatedPayment = await tx.payment.update({
+                where: { id: payment.id },
+                data: {
+                    status: "SUCCESS",
+                    providerTxnId: payload.providerTxnId || generateProviderTxnId(),
+                    paidAt: new Date(),
+                },
+                select: paymentSelect,
+            });
+
+            await tx.booking.update({
+                where: { id: payment.bookingId },
+                data: { status: "PAID", paidAt: new Date() },
+            });
+
+            return updatedPayment;
+        });
     }
 
-    let gatewayData: Record<string, unknown> = {};
-    let method: string | undefined;
-
-    if (payment.provider === "SSLCOMMERZ") {
-        if (payload.val_id) {
-            const validation = await validateSSLCommerzPayment(payload.val_id);
-            gatewayData = validation;
-
-            if (validation.status !== "VALID" && validation.status !== "VALIDATED") {
-                throw new AppError("Payment validation failed", 400);
-            }
-
-            method = validation.card_type || validation.card_brand || "SSLCommerz";
-        } else if (isDevPaymentMode()) {
-            gatewayData = { status: "DEV_CONFIRMED" };
-            method = "dev_mock";
-        } else {
-            throw new AppError("val_id is required for SSLCommerz confirmation", 400);
-        }
-    } else if (payment.provider === "STRIPE") {
-        if (payload.sessionId) {
-            const session = await validateStripeSession(payload.sessionId);
-            gatewayData = session as unknown as Record<string, unknown>;
-
-            if (session.payment_status !== "paid") {
-                throw new AppError("Stripe payment is not completed", 400);
-            }
-
-            method = "card";
-        } else if (isDevPaymentMode()) {
-            gatewayData = { status: "DEV_CONFIRMED" };
-            method = "dev_mock";
-        } else {
-            throw new AppError("sessionId is required for Stripe confirmation", 400);
-        }
-    }
-
-    return completePayment(payment.id, gatewayData, method);
-};
-
-export const handleShurjoPayCallback = async (orderId: string) => {
-    const payment = await prisma.payment.findFirst({
-        where: {
-            transactionId: orderId,
-            provider: "SHURJOPAY",
+    return prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+            status: payload.status,
+            failedAt: payload.status === "FAILED" ? new Date() : null,
+            providerTxnId: payload.providerTxnId,
         },
+        select: paymentSelect,
     });
-
-    if (!payment) {
-        throw new AppError("Payment not found for this ShurjoPay order", 404);
-    }
-
-    return verifyAndCompleteShurjoPayment(payment.id, orderId);
 };
 
-export const getCustomerPayments = async (
-    customerId: string,
-    query: PaymentQuery
-) => {
-    const { page, limit, status } = query;
-    const skip = (page - 1) * limit;
-
-    const where = {
-        booking: { customerId },
-        ...(status && { status }),
-    };
-
-    const [payments, total] = await Promise.all([
-        prisma.payment.findMany({
-            where,
-            select: paymentSelect,
-            skip,
-            take: limit,
-            orderBy: { createdAt: "desc" },
-        }),
-        prisma.payment.count({ where }),
-    ]);
-
-    return {
-        payments,
-        meta: {
-            page,
-            limit,
-            total,
-            totalPages: Math.ceil(total / limit),
-        },
-    };
-};
-
-export const getPaymentById = async (customerId: string, paymentId: string) => {
+export const getPaymentById = async (userId: string, role: string, paymentId: string) => {
     const payment = await prisma.payment.findFirst({
         where: {
             id: paymentId,
-            booking: { customerId },
+            ...(role === "ADMIN"
+                ? {}
+                : {
+                      OR: [
+                          { userId },
+                          { booking: { technician: { userId } } },
+                      ],
+                  }),
         },
         select: paymentSelect,
     });
@@ -422,4 +175,39 @@ export const getPaymentById = async (customerId: string, paymentId: string) => {
     }
 
     return payment;
+};
+
+export const refundPayment = async (paymentId: string) => {
+    const payment = await prisma.payment.findUnique({
+        where: { id: paymentId },
+        include: { booking: true },
+    });
+
+    if (!payment) {
+        throw new AppError("Payment not found", 404);
+    }
+
+    if (payment.status !== "SUCCESS") {
+        throw new AppError("Only successful payments can be refunded", 400);
+    }
+
+    return prisma.$transaction(async (tx) => {
+        const updated = await tx.payment.update({
+            where: { id: paymentId },
+            data: { status: "REFUNDED" },
+            select: paymentSelect,
+        });
+
+        if (
+            payment.booking.status !== "CANCELLED" &&
+            payment.booking.status !== "COMPLETED"
+        ) {
+            await tx.booking.update({
+                where: { id: payment.bookingId },
+                data: { status: "CANCELLED", cancelledAt: new Date() },
+            });
+        }
+
+        return updated;
+    });
 };

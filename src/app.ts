@@ -9,14 +9,14 @@ import { catchAsync } from "./utils/catchAsync.js";
 import { adminRoutes } from "./module/admin/admin.routes.js";
 import { authRoutes } from "./module/auth/auth.routes.js";
 import { bookingRoutes } from "./module/booking/booking.routes.js";
-import { categoryRoutes } from "./module/category/category.routes.js";
+import {
+    areaRoutes,
+    categoryRoutes,
+} from "./module/category/category.routes.js";
 import { paymentRoutes } from "./module/payment/payment.routes.js";
 import { reviewRoutes } from "./module/review/review.routes.js";
 import { serviceRoutes } from "./module/service/service.routes.js";
-import {
-    technicianManagementRoutes,
-    technicianRoutes,
-} from "./module/technician/technician.routes.js";
+import { technicianRoutes } from "./module/technician/technician.routes.js";
 
 const app: Application = express();
 
@@ -27,8 +27,6 @@ app.use(
     })
 );
 
-app.use("/api/subscription/webhook", express.raw({ type: "application/json" }));
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -38,13 +36,16 @@ app.get("/", (req: Request, res: Response) => {
 });
 
 app.get(
-    "/api/health",
+    "/api/v1/health",
     catchAsync(async (req: Request, res: Response) => {
         if (!config.database_url?.trim()) {
             res.status(503).json({
                 success: false,
-                message:
-                    "DATABASE_URL is not configured. Add it to Vercel Environment Variables for Production.",
+                error: {
+                    code: "DATABASE_UNCONFIGURED",
+                    message:
+                        "DATABASE_URL is not configured. Add it to environment variables.",
+                },
             });
             return;
         }
@@ -53,7 +54,6 @@ app.get(
 
         res.status(200).json({
             success: true,
-            message: "API is healthy",
             data: {
                 status: "ok",
                 environment: config.node_env,
@@ -64,15 +64,20 @@ app.get(
     })
 );
 
-app.use("/api/auth", authRoutes);
-app.use("/api/categories", categoryRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/services", serviceRoutes);
-app.use("/api/bookings", bookingRoutes);
-app.use("/api/payments", paymentRoutes);
-app.use("/api/reviews", reviewRoutes);
-app.use("/api/technicians", technicianRoutes);
-app.use("/api/technician", technicianManagementRoutes);
+const apiV1 = express.Router();
+
+apiV1.use("/auth", authRoutes);
+apiV1.use("/categories", categoryRoutes);
+apiV1.use("/areas", areaRoutes);
+apiV1.use("/admin", adminRoutes);
+apiV1.use("/services", serviceRoutes);
+apiV1.use("/bookings", bookingRoutes);
+apiV1.use("/payments", paymentRoutes);
+apiV1.use("/reviews", reviewRoutes);
+apiV1.use("/technicians", technicianRoutes);
+
+app.use("/api/v1", apiV1);
+
 app.use(notFound);
 app.use(globalErrorHandler);
 

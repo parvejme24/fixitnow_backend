@@ -1,34 +1,47 @@
 import { Router } from "express";
 import { authenticate } from "../../middleware/auth.js";
+import { requireAdmin } from "../../middleware/admin.js";
 import { requireTechnician } from "../../middleware/technician.js";
+import { getTechnicianReviews } from "../review/review.controller.js";
 import {
-    createService,
-    deleteService,
-    getBookings,
-    getServices,
+    createAvailability,
+    deleteAvailability,
     getTechnicianProfile,
+    getTechnicianSlots,
     getTechnicians,
+    getTopTechnicians,
     updateAvailability,
-    updateBookingStatus,
+    updateCategories,
     updateProfile,
-    updateService,
+    updateSkills,
+    verifyTechnician,
 } from "./technician.controller.js";
 
-const publicRouter = Router();
-const managementRouter = Router();
+const router = Router();
 
-publicRouter.get("/", getTechnicians);
-publicRouter.get("/:id", getTechnicianProfile);
+router.get("/", getTechnicians);
+router.get("/top", getTopTechnicians);
 
-managementRouter.use(authenticate, requireTechnician);
-managementRouter.put("/profile", updateProfile);
-managementRouter.put("/availability", updateAvailability);
-managementRouter.get("/services", getServices);
-managementRouter.post("/services", createService);
-managementRouter.patch("/services/:id", updateService);
-managementRouter.delete("/services/:id", deleteService);
-managementRouter.get("/bookings", getBookings);
-managementRouter.patch("/bookings/:id", updateBookingStatus);
+router.patch("/me", authenticate, requireTechnician, updateProfile);
+router.put("/me/categories", authenticate, requireTechnician, updateCategories);
+router.put("/me/skills", authenticate, requireTechnician, updateSkills);
+router.post("/me/slots", authenticate, requireTechnician, createAvailability);
+router.patch(
+    "/me/slots/:slotId",
+    authenticate,
+    requireTechnician,
+    updateAvailability
+);
+router.delete(
+    "/me/slots/:slotId",
+    authenticate,
+    requireTechnician,
+    deleteAvailability
+);
 
-export const technicianRoutes = publicRouter;
-export const technicianManagementRoutes = managementRouter;
+router.patch("/:id/verify", authenticate, requireAdmin, verifyTechnician);
+router.get("/:id/reviews", getTechnicianReviews);
+router.get("/:id/slots", getTechnicianSlots);
+router.get("/:id", getTechnicianProfile);
+
+export const technicianRoutes = router;

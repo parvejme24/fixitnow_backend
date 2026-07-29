@@ -1,26 +1,35 @@
-import { BookingStatus } from "../../../generated/prisma/enums.js";
+import { randomUUID } from "node:crypto";
 import { Prisma } from "../../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../utils/AppError.js";
 import {
-    CreateServiceInput,
-    TechnicianBookingQuery,
+    CreateAvailabilitySlotInput,
+    SlotsQuery,
     TechnicianQuery,
-    UpdateAvailabilityInput,
-    UpdateBookingStatusInput,
+    UpdateAvailabilitySlotInput,
+    UpdateCategoriesInput,
     UpdateProfileInput,
-    UpdateServiceInput,
+    UpdateSkillsInput,
+    VerifyTechnicianInput,
 } from "./technician.interface.js";
 
 const technicianListSelect = {
     id: true,
+    trade: true,
     bio: true,
-    skills: true,
-    experienceYears: true,
-    hourlyRate: true,
-    location: true,
-    avgRating: true,
-    totalReviews: true,
+    initials: true,
+    visitFee: true,
+    experienceYrs: true,
+    jobsCompleted: true,
+    ratingAvg: true,
+    reviewCount: true,
+    online: true,
+    verified: true,
+    coverKm: true,
+    replyMins: true,
+    area: {
+        select: { id: true, name: true },
+    },
     user: {
         select: {
             id: true,
@@ -28,32 +37,20 @@ const technicianListSelect = {
             phone: true,
         },
     },
-    services: {
-        where: { isActive: true },
+    categories: {
         select: {
-            id: true,
-            title: true,
-            price: true,
             category: {
-                select: {
-                    id: true,
-                    name: true,
-                },
+                select: { id: true, name: true, slug: true },
             },
         },
-        take: 3,
+    },
+    skills: {
+        select: { id: true, name: true },
     },
 } satisfies Prisma.TechnicianProfileSelect;
 
 const profileSelect = {
-    id: true,
-    bio: true,
-    skills: true,
-    experienceYears: true,
-    hourlyRate: true,
-    location: true,
-    avgRating: true,
-    totalReviews: true,
+    ...technicianListSelect,
     createdAt: true,
     updatedAt: true,
     user: {
@@ -64,82 +61,18 @@ const profileSelect = {
             phone: true,
         },
     },
-    availability: {
-        select: {
-            id: true,
-            day: true,
-            startTime: true,
-            endTime: true,
-        },
-        orderBy: { day: "asc" as const },
-    },
+} satisfies Prisma.TechnicianProfileSelect;
+
+const getInitials = (name: string) => {
+    return name
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? "")
+        .join("");
 };
 
-const technicianServiceSelect = {
-    id: true,
-    title: true,
-    description: true,
-    price: true,
-    isActive: true,
-    createdAt: true,
-    updatedAt: true,
-    category: {
-        select: {
-            id: true,
-            name: true,
-            icon: true,
-        },
-    },
-};
-
-const bookingSelect = {
-    id: true,
-    scheduledAt: true,
-    address: true,
-    notes: true,
-    status: true,
-    createdAt: true,
-    updatedAt: true,
-    customer: {
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-        },
-    },
-    service: {
-        select: {
-            id: true,
-            title: true,
-            price: true,
-            category: {
-                select: {
-                    id: true,
-                    name: true,
-                },
-            },
-        },
-    },
-    payment: {
-        select: {
-            id: true,
-            status: true,
-            amount: true,
-            provider: true,
-        },
-    },
-};
-
-const technicianStatusTransitions: Partial<
-    Record<BookingStatus, BookingStatus[]>
-> = {
-    REQUESTED: ["ACCEPTED", "DECLINED"],
-    PAID: ["IN_PROGRESS"],
-    IN_PROGRESS: ["COMPLETED"],
-};
-
-const getTechnicianProfileByUserId = async (userId: string) => {
+export const getTechnicianProfileByUserId = async (userId: string) => {
     const existingProfile = await prisma.technicianProfile.findUnique({
         where: { userId },
     });
@@ -150,47 +83,119 @@ const getTechnicianProfileByUserId = async (userId: string) => {
 
     const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { role: true, status: true },
+        select: { name: true, role: true, isActive: true },
     });
 
     if (!user || user.role !== "TECHNICIAN") {
         throw new AppError("Technician profile not found", 404);
     }
 
-    if (user.status === "BANNED") {
+    if (!user.isActive) {
         throw new AppError("Your account has been banned", 403);
     }
 
     return prisma.technicianProfile.create({
-        data: { userId },
+        data: {
+            id: randomUUID(),
+            userId,
+            trade: "General",
+            initials: getInitials(user.name),
+            visitFee: 0,
+        },
     });
 };
 
-const validateTimeRange = (startTime: string, endTime: string) => {
-    if (startTime >= endTime) {
-        throw new AppError("startTime must be before endTime", 400);
+const buildOrderBy = (
+    sort?: TechnicianQuery["sort"]
+): Prisma.TechnicianProfileOrderByWithRelationInput[] => {
+    switch (sort) {
+        case "rating":
+            return [{ ratingAvg: "desc" }];
+        case "price-asc":
+            return [{ visitFee: "asc" }];
+        case "price-desc":
+            return [{ visitFee: "desc" }];
+        case "pop":
+            return [{ jobsCompleted: "desc" }, { ratingAvg: "desc" }];
+        default:
+            return [{ ratingAvg: "desc" }];
     }
 };
 
 export const getAllTechnicians = async (query: TechnicianQuery) => {
-    const { page, limit, location, minRating, categoryId, search } = query;
+    const { page, limit } = query;
     const skip = (page - 1) * limit;
+    const search = query.q || query.search;
+    const categoryId = query.cat || query.categoryId;
+    const areaFilter = query.area || query.areaId;
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
 
     const where: Prisma.TechnicianProfileWhereInput = {
-        user: { status: "ACTIVE" },
-        ...(location && {
-            location: { contains: location, mode: "insensitive" },
-        }),
-        ...(minRating !== undefined && { avgRating: { gte: minRating } }),
+        user: { isActive: true },
+        AND: [
+            ...(areaFilter
+                ? [
+                      {
+                          OR: [
+                              { areaId: areaFilter },
+                              {
+                                  area: {
+                                      name: {
+                                          equals: areaFilter,
+                                          mode: "insensitive" as const,
+                                      },
+                                  },
+                              },
+                          ],
+                      },
+                  ]
+                : []),
+            ...(search
+                ? [
+                      {
+                          OR: [
+                              {
+                                  user: {
+                                      name: {
+                                          contains: search,
+                                          mode: "insensitive" as const,
+                                      },
+                                  },
+                              },
+                              {
+                                  trade: {
+                                      contains: search,
+                                      mode: "insensitive" as const,
+                                  },
+                              },
+                              {
+                                  bio: {
+                                      contains: search,
+                                      mode: "insensitive" as const,
+                                  },
+                              },
+                          ],
+                      },
+                  ]
+                : []),
+        ],
+        ...(query.minRating !== undefined && { ratingAvg: { gte: query.minRating } }),
+        ...(query.maxRate !== undefined && { visitFee: { lte: query.maxRate } }),
+        ...(query.online !== undefined && { online: query.online }),
         ...(categoryId && {
-            services: { some: { categoryId, isActive: true } },
+            categories: { some: { categoryId } },
         }),
-        ...(search && {
-            OR: [
-                { user: { name: { contains: search, mode: "insensitive" } } },
-                { location: { contains: search, mode: "insensitive" } },
-                { bio: { contains: search, mode: "insensitive" } },
-            ],
+        ...(query.today && {
+            slots: {
+                some: {
+                    isBooked: false,
+                    date: { gte: todayStart, lt: todayEnd },
+                },
+            },
         }),
     };
 
@@ -200,7 +205,7 @@ export const getAllTechnicians = async (query: TechnicianQuery) => {
             select: technicianListSelect,
             skip,
             take: limit,
-            orderBy: { avgRating: "desc" },
+            orderBy: buildOrderBy(query.sort),
         }),
         prisma.technicianProfile.count({ where }),
     ]);
@@ -216,69 +221,45 @@ export const getAllTechnicians = async (query: TechnicianQuery) => {
     };
 };
 
+export const getTopTechnicians = async () => {
+    return prisma.technicianProfile.findMany({
+        where: { user: { isActive: true }, verified: true },
+        select: technicianListSelect,
+        take: 3,
+        orderBy: [{ ratingAvg: "desc" }, { jobsCompleted: "desc" }],
+    });
+};
+
 export const getTechnicianById = async (id: string) => {
     const technician = await prisma.technicianProfile.findFirst({
         where: {
             id,
-            user: { status: "ACTIVE" },
+            user: { isActive: true },
         },
         select: {
-            id: true,
-            bio: true,
-            skills: true,
-            experienceYears: true,
-            hourlyRate: true,
-            location: true,
-            avgRating: true,
-            totalReviews: true,
-            createdAt: true,
-            user: {
+            ...profileSelect,
+            categories: {
                 select: {
-                    id: true,
-                    name: true,
-                    phone: true,
-                    email: true,
-                },
-            },
-            services: {
-                where: { isActive: true },
-                select: {
-                    id: true,
-                    title: true,
-                    description: true,
-                    price: true,
                     category: {
                         select: {
                             id: true,
                             name: true,
-                            icon: true,
+                            slug: true,
+                            services: {
+                                where: { isActive: true },
+                                select: {
+                                    id: true,
+                                    title: true,
+                                    price: true,
+                                    duration: true,
+                                    ratingAvg: true,
+                                    tag: true,
+                                },
+                                take: 8,
+                            },
                         },
                     },
                 },
-            },
-            availability: {
-                select: {
-                    id: true,
-                    day: true,
-                    startTime: true,
-                    endTime: true,
-                },
-                orderBy: { day: "asc" },
-            },
-            reviews: {
-                select: {
-                    id: true,
-                    rating: true,
-                    comment: true,
-                    createdAt: true,
-                    customer: {
-                        select: {
-                            id: true,
-                            name: true,
-                        },
-                    },
-                },
-                orderBy: { createdAt: "desc" },
             },
         },
     });
@@ -287,7 +268,57 @@ export const getTechnicianById = async (id: string) => {
         throw new AppError("Technician not found", 404);
     }
 
-    return technician;
+    const offeredServices = technician.categories.flatMap((item) =>
+        item.category.services.map((service) => ({
+            ...service,
+            category: {
+                id: item.category.id,
+                name: item.category.name,
+                slug: item.category.slug,
+            },
+        }))
+    );
+
+    return {
+        ...technician,
+        categories: technician.categories.map((item) => ({
+            id: item.category.id,
+            name: item.category.name,
+            slug: item.category.slug,
+        })),
+        offeredServices,
+    };
+};
+
+export const getTechnicianSlots = async (id: string, query: SlotsQuery) => {
+    const technician = await prisma.technicianProfile.findFirst({
+        where: { id, user: { isActive: true } },
+        select: { id: true },
+    });
+
+    if (!technician) {
+        throw new AppError("Technician not found", 404);
+    }
+
+    const from = query.from ? new Date(query.from) : new Date();
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(from);
+    to.setDate(to.getDate() + query.days);
+
+    return prisma.availabilitySlot.findMany({
+        where: {
+            technicianId: id,
+            date: { gte: from, lt: to },
+        },
+        select: {
+            id: true,
+            date: true,
+            startTime: true,
+            endTime: true,
+            isBooked: true,
+        },
+        orderBy: [{ date: "asc" }, { startTime: "asc" }],
+    });
 };
 
 export const updateTechnicianProfile = async (
@@ -303,34 +334,28 @@ export const updateTechnicianProfile = async (
     });
 };
 
-export const updateTechnicianAvailability = async (
+export const updateTechnicianSkills = async (
     userId: string,
-    payload: UpdateAvailabilityInput
+    payload: UpdateSkillsInput
 ) => {
     const profile = await getTechnicianProfileByUserId(userId);
-
-    const uniqueDays = new Set(payload.slots.map((slot) => slot.day));
-    if (uniqueDays.size !== payload.slots.length) {
-        throw new AppError("Duplicate days are not allowed in availability", 400);
-    }
-
-    payload.slots.forEach((slot) => {
-        validateTimeRange(slot.startTime, slot.endTime);
-    });
+    const uniqueSkills = [
+        ...new Set(payload.skills.map((skill) => skill.trim()).filter(Boolean)),
+    ];
 
     return prisma.$transaction(async (tx) => {
-        await tx.availabilitySlot.deleteMany({
+        await tx.technicianSkill.deleteMany({
             where: { technicianId: profile.id },
         });
 
-        await tx.availabilitySlot.createMany({
-            data: payload.slots.map((slot) => ({
-                technicianId: profile.id,
-                day: slot.day,
-                startTime: slot.startTime,
-                endTime: slot.endTime,
-            })),
-        });
+        if (uniqueSkills.length > 0) {
+            await tx.technicianSkill.createMany({
+                data: uniqueSkills.map((name) => ({
+                    technicianId: profile.id,
+                    name,
+                })),
+            });
+        }
 
         return tx.technicianProfile.findUniqueOrThrow({
             where: { id: profile.id },
@@ -339,177 +364,142 @@ export const updateTechnicianAvailability = async (
     });
 };
 
-export const getTechnicianBookings = async (
+export const updateTechnicianCategories = async (
     userId: string,
-    query: TechnicianBookingQuery
+    payload: UpdateCategoriesInput
 ) => {
     const profile = await getTechnicianProfileByUserId(userId);
-    const { page, limit, status } = query;
-    const skip = (page - 1) * limit;
+    const uniqueCategoryIds = [...new Set(payload.categoryIds)];
 
-    const where = {
-        technicianId: profile.id,
-        ...(status && { status }),
-    };
+    if (uniqueCategoryIds.length > 0) {
+        const count = await prisma.category.count({
+            where: { id: { in: uniqueCategoryIds } },
+        });
 
-    const [bookings, total] = await Promise.all([
-        prisma.booking.findMany({
-            where,
-            select: bookingSelect,
-            skip,
-            take: limit,
-            orderBy: { createdAt: "desc" },
-        }),
-        prisma.booking.count({ where }),
-    ]);
+        if (count !== uniqueCategoryIds.length) {
+            throw new AppError("One or more categories were not found", 404);
+        }
+    }
 
-    return {
-        bookings,
-        meta: {
-            page,
-            limit,
-            total,
-            totalPages: Math.ceil(total / limit),
-        },
-    };
+    return prisma.$transaction(async (tx) => {
+        await tx.technicianCategory.deleteMany({
+            where: { technicianId: profile.id },
+        });
+
+        if (uniqueCategoryIds.length > 0) {
+            await tx.technicianCategory.createMany({
+                data: uniqueCategoryIds.map((categoryId) => ({
+                    technicianId: profile.id,
+                    categoryId,
+                })),
+            });
+        }
+
+        return tx.technicianProfile.findUniqueOrThrow({
+            where: { id: profile.id },
+            select: profileSelect,
+        });
+    });
 };
 
-export const updateTechnicianBookingStatus = async (
+export const createTechnicianAvailabilitySlot = async (
     userId: string,
-    bookingId: string,
-    payload: UpdateBookingStatusInput
+    payload: CreateAvailabilitySlotInput
 ) => {
     const profile = await getTechnicianProfileByUserId(userId);
 
-    const booking = await prisma.booking.findFirst({
+    const existing = await prisma.availabilitySlot.findUnique({
         where: {
-            id: bookingId,
-            technicianId: profile.id,
-        },
-    });
-
-    if (!booking) {
-        throw new AppError("Booking not found", 404);
-    }
-
-    const allowedStatuses = technicianStatusTransitions[booking.status];
-
-    if (!allowedStatuses?.includes(payload.status)) {
-        throw new AppError(
-            `Cannot change booking status from ${booking.status} to ${payload.status}`,
-            400
-        );
-    }
-
-    return prisma.booking.update({
-        where: { id: bookingId },
-        data: { status: payload.status },
-        select: bookingSelect,
-    });
-};
-
-const validateCategory = async (categoryId: string) => {
-    const category = await prisma.category.findUnique({
-        where: { id: categoryId },
-    });
-
-    if (!category) {
-        throw new AppError("Category not found", 404);
-    }
-
-    return category;
-};
-
-export const getTechnicianServices = async (userId: string) => {
-    const profile = await getTechnicianProfileByUserId(userId);
-
-    return prisma.service.findMany({
-        where: { technicianId: profile.id },
-        select: technicianServiceSelect,
-        orderBy: { createdAt: "desc" },
-    });
-};
-
-export const createTechnicianService = async (
-    userId: string,
-    payload: CreateServiceInput
-) => {
-    const profile = await getTechnicianProfileByUserId(userId);
-    await validateCategory(payload.categoryId);
-
-    return prisma.service.create({
-        data: {
-            title: payload.title,
-            description: payload.description,
-            price: payload.price,
-            categoryId: payload.categoryId,
-            technicianId: profile.id,
-        },
-        select: technicianServiceSelect,
-    });
-};
-
-export const updateTechnicianService = async (
-    userId: string,
-    serviceId: string,
-    payload: UpdateServiceInput
-) => {
-    const profile = await getTechnicianProfileByUserId(userId);
-
-    const service = await prisma.service.findFirst({
-        where: {
-            id: serviceId,
-            technicianId: profile.id,
-        },
-    });
-
-    if (!service) {
-        throw new AppError("Service not found", 404);
-    }
-
-    if (payload.categoryId) {
-        await validateCategory(payload.categoryId);
-    }
-
-    return prisma.service.update({
-        where: { id: serviceId },
-        data: payload,
-        select: technicianServiceSelect,
-    });
-};
-
-export const deleteTechnicianService = async (
-    userId: string,
-    serviceId: string
-) => {
-    const profile = await getTechnicianProfileByUserId(userId);
-
-    const service = await prisma.service.findFirst({
-        where: {
-            id: serviceId,
-            technicianId: profile.id,
-        },
-        include: {
-            _count: {
-                select: { bookings: true },
+            technicianId_date_startTime: {
+                technicianId: profile.id,
+                date: payload.date,
+                startTime: payload.startTime,
             },
         },
     });
 
-    if (!service) {
-        throw new AppError("Service not found", 404);
+    if (existing) {
+        throw new AppError("A slot already exists for this date and time", 409);
     }
 
-    if (service._count.bookings > 0) {
-        throw new AppError(
-            "Cannot delete service that has linked bookings. Deactivate it instead.",
-            400
-        );
-    }
+    return prisma.availabilitySlot.create({
+        data: {
+            technicianId: profile.id,
+            date: payload.date,
+            startTime: payload.startTime,
+            endTime: payload.endTime,
+        },
+    });
+};
 
-    await prisma.service.delete({
-        where: { id: serviceId },
+export const updateTechnicianAvailabilitySlot = async (
+    userId: string,
+    slotId: string,
+    payload: UpdateAvailabilitySlotInput
+) => {
+    const profile = await getTechnicianProfileByUserId(userId);
+
+    const slot = await prisma.availabilitySlot.findFirst({
+        where: { id: slotId, technicianId: profile.id },
     });
 
-    return service;
+    if (!slot) {
+        throw new AppError("Availability slot not found", 404);
+    }
+
+    if (slot.isBooked && (payload.date || payload.startTime)) {
+        throw new AppError("Cannot reschedule a booked slot", 400);
+    }
+
+    return prisma.availabilitySlot.update({
+        where: { id: slotId },
+        data: {
+            ...(payload.date !== undefined && { date: payload.date }),
+            ...(payload.startTime !== undefined && { startTime: payload.startTime }),
+            ...(payload.endTime !== undefined && { endTime: payload.endTime }),
+            ...(payload.isBooked !== undefined && { isBooked: payload.isBooked }),
+        },
+    });
+};
+
+export const deleteTechnicianAvailabilitySlot = async (
+    userId: string,
+    slotId: string
+) => {
+    const profile = await getTechnicianProfileByUserId(userId);
+
+    const slot = await prisma.availabilitySlot.findFirst({
+        where: { id: slotId, technicianId: profile.id },
+    });
+
+    if (!slot) {
+        throw new AppError("Availability slot not found", 404);
+    }
+
+    if (slot.isBooked) {
+        throw new AppError("Cannot delete a slot that is already booked", 400);
+    }
+
+    await prisma.availabilitySlot.delete({ where: { id: slotId } });
+
+    return slot;
+};
+
+export const verifyTechnician = async (
+    technicianId: string,
+    payload: VerifyTechnicianInput
+) => {
+    const technician = await prisma.technicianProfile.findUnique({
+        where: { id: technicianId },
+    });
+
+    if (!technician) {
+        throw new AppError("Technician not found", 404);
+    }
+
+    return prisma.technicianProfile.update({
+        where: { id: technicianId },
+        data: { verified: payload.verified },
+        select: profileSelect,
+    });
 };

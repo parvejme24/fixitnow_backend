@@ -1,88 +1,75 @@
 import { z } from "zod";
 import { paginationSchema } from "../service/service.interface.js";
 
-const timeSchema = z
-    .string()
-    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Time must be in HH:mm format");
-
 export const technicianQuerySchema = paginationSchema.extend({
-    location: z.string().optional(),
-    minRating: z.coerce.number().min(0).max(5).optional(),
-    categoryId: z.string().optional(),
+    q: z.string().optional(),
     search: z.string().optional(),
+    cat: z.string().optional(),
+    categoryId: z.string().optional(),
+    area: z.string().optional(),
+    areaId: z.string().optional(),
+    minRating: z.coerce.number().min(0).max(5).optional(),
+    maxRate: z.coerce.number().min(0).optional(),
+    today: z.coerce.boolean().optional(),
+    online: z.coerce.boolean().optional(),
+    sort: z.enum(["pop", "rating", "price-asc", "price-desc"]).optional(),
+});
+
+export const slotsQuerySchema = z.object({
+    from: z.string().optional(),
+    days: z.coerce.number().int().min(1).max(30).default(7),
 });
 
 export const updateProfileSchema = z
     .object({
+        trade: z.string().min(2, "Trade must be at least 2 characters").optional(),
         bio: z.string().optional(),
-        skills: z.array(z.string().min(1)).optional(),
-        experienceYears: z.coerce.number().int().min(0).optional(),
-        hourlyRate: z.coerce.number().min(0).optional(),
-        location: z.string().optional(),
+        areaId: z.string().optional(),
+        visitFee: z.coerce.number().min(0).optional(),
+        experienceYrs: z.coerce.number().int().min(0).optional(),
+        coverKm: z.coerce.number().int().min(0).optional(),
+        replyMins: z.coerce.number().int().min(0).optional(),
+        online: z.boolean().optional(),
+        initials: z.string().min(1).max(4).optional(),
     })
     .refine((data) => Object.values(data).some((value) => value !== undefined), {
         message: "At least one field is required to update",
     });
 
-export const availabilitySlotSchema = z.object({
-    day: z.enum([
-        "SATURDAY",
-        "SUNDAY",
-        "MONDAY",
-        "TUESDAY",
-        "WEDNESDAY",
-        "THURSDAY",
-        "FRIDAY",
-    ]),
-    startTime: timeSchema,
-    endTime: timeSchema,
+export const updateSkillsSchema = z.object({
+    skills: z.array(z.string().min(1)),
 });
 
-export const updateAvailabilitySchema = z.object({
-    slots: z.array(availabilitySlotSchema).min(1, "At least one slot is required"),
+export const updateCategoriesSchema = z.object({
+    categoryIds: z.array(z.string().min(1)),
 });
 
-export const technicianBookingQuerySchema = paginationSchema.extend({
-    status: z
-        .enum([
-            "REQUESTED",
-            "ACCEPTED",
-            "DECLINED",
-            "PAID",
-            "IN_PROGRESS",
-            "COMPLETED",
-            "CANCELLED",
-        ])
-        .optional(),
+export const createAvailabilitySlotSchema = z.object({
+    date: z.coerce.date({ message: "Valid date is required" }),
+    startTime: z.string().min(1, "startTime is required"),
+    endTime: z.string().optional(),
 });
 
-export const updateBookingStatusSchema = z.object({
-    status: z.enum(["ACCEPTED", "DECLINED", "IN_PROGRESS", "COMPLETED"]),
-});
-
-export const createServiceSchema = z.object({
-    title: z.string().min(2, "Title must be at least 2 characters"),
-    description: z.string().optional(),
-    price: z.coerce.number().positive("Price must be greater than 0"),
-    categoryId: z.string().min(1, "Category is required"),
-});
-
-export const updateServiceSchema = z
+export const updateAvailabilitySlotSchema = z
     .object({
-        title: z.string().min(2, "Title must be at least 2 characters").optional(),
-        description: z.string().optional(),
-        price: z.coerce.number().positive("Price must be greater than 0").optional(),
-        categoryId: z.string().optional(),
-        isActive: z.boolean().optional(),
+        date: z.coerce.date().optional(),
+        startTime: z.string().min(1).optional(),
+        endTime: z.string().optional().nullable(),
+        isBooked: z.boolean().optional(),
     })
     .refine((data) => Object.values(data).some((value) => value !== undefined), {
         message: "At least one field is required to update",
     });
+
+export const verifyTechnicianSchema = z.object({
+    verified: z.boolean(),
+});
 
 export type TechnicianQuery = z.infer<typeof technicianQuerySchema>;
+export type SlotsQuery = z.infer<typeof slotsQuerySchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
-export type UpdateAvailabilityInput = z.infer<typeof updateAvailabilitySchema>;
-export type TechnicianBookingQuery = z.infer<typeof technicianBookingQuerySchema>;
-export type UpdateBookingStatusInput = z.infer<typeof updateBookingStatusSchema>;
-export type CreateServiceInput = z.infer<typeof createServiceSchema>;
-export type UpdateServiceInput = z.infer<typeof updateServiceSchema>;
+export type UpdateSkillsInput = z.infer<typeof updateSkillsSchema>;
+export type UpdateCategoriesInput = z.infer<typeof updateCategoriesSchema>;
+export type CreateAvailabilitySlotInput = z.infer<typeof createAvailabilitySlotSchema>;
+export type UpdateAvailabilitySlotInput = z.infer<typeof updateAvailabilitySlotSchema>;
+export type VerifyTechnicianInput = z.infer<typeof verifyTechnicianSchema>;

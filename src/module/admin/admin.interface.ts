@@ -3,12 +3,12 @@ import { paginationSchema } from "../service/service.interface.js";
 
 export const adminUserQuerySchema = paginationSchema.extend({
     role: z.enum(["CUSTOMER", "TECHNICIAN", "ADMIN"]).optional(),
-    status: z.enum(["ACTIVE", "BANNED"]).optional(),
+    isActive: z.coerce.boolean().optional(),
     search: z.string().optional(),
 });
 
 export const updateUserStatusSchema = z.object({
-    status: z.enum(["ACTIVE", "BANNED"]),
+    isActive: z.boolean(),
 });
 
 export const adminBookingQuerySchema = paginationSchema.extend({
@@ -18,7 +18,8 @@ export const adminBookingQuerySchema = paginationSchema.extend({
             "ACCEPTED",
             "DECLINED",
             "PAID",
-            "IN_PROGRESS",
+            "EN_ROUTE",
+            "ON_SITE",
             "COMPLETED",
             "CANCELLED",
         ])

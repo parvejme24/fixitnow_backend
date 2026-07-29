@@ -1,13 +1,14 @@
 import { Request, Response } from "express";
 import { catchAsync } from "../../utils/catchAsync.js";
 import {
-    createServiceSchema,
-    technicianBookingQuerySchema,
+    createAvailabilitySlotSchema,
+    slotsQuerySchema,
     technicianQuerySchema,
-    updateAvailabilitySchema,
-    updateBookingStatusSchema,
+    updateAvailabilitySlotSchema,
+    updateCategoriesSchema,
     updateProfileSchema,
-    updateServiceSchema,
+    updateSkillsSchema,
+    verifyTechnicianSchema,
 } from "./technician.interface.js";
 import * as technicianService from "./technician.service.js";
 
@@ -17,11 +18,21 @@ export const getTechnicians = catchAsync(async (req: Request, res: Response) => 
 
     res.status(200).json({
         success: true,
-        message: "Technicians fetched successfully",
         meta: result.meta,
         data: result.technicians,
     });
 });
+
+export const getTopTechnicians = catchAsync(
+    async (req: Request, res: Response) => {
+        const technicians = await technicianService.getTopTechnicians();
+
+        res.status(200).json({
+            success: true,
+            data: technicians,
+        });
+    }
+);
 
 export const getTechnicianProfile = catchAsync(
     async (req: Request, res: Response) => {
@@ -31,8 +42,22 @@ export const getTechnicianProfile = catchAsync(
 
         res.status(200).json({
             success: true,
-            message: "Technician profile fetched successfully",
             data: technician,
+        });
+    }
+);
+
+export const getTechnicianSlots = catchAsync(
+    async (req: Request, res: Response) => {
+        const query = slotsQuerySchema.parse(req.query);
+        const slots = await technicianService.getTechnicianSlots(
+            req.params.id as string,
+            query
+        );
+
+        res.status(200).json({
+            success: true,
+            data: slots,
         });
     }
 );
@@ -46,109 +71,92 @@ export const updateProfile = catchAsync(async (req: Request, res: Response) => {
 
     res.status(200).json({
         success: true,
-        message: "Technician profile updated successfully",
         data: profile,
     });
 });
 
+export const updateSkills = catchAsync(async (req: Request, res: Response) => {
+    const payload = updateSkillsSchema.parse(req.body);
+    const profile = await technicianService.updateTechnicianSkills(
+        req.user!.userId,
+        payload
+    );
+
+    res.status(200).json({
+        success: true,
+        data: profile,
+    });
+});
+
+export const updateCategories = catchAsync(async (req: Request, res: Response) => {
+    const payload = updateCategoriesSchema.parse(req.body);
+    const profile = await technicianService.updateTechnicianCategories(
+        req.user!.userId,
+        payload
+    );
+
+    res.status(200).json({
+        success: true,
+        data: profile,
+    });
+});
+
+export const createAvailability = catchAsync(
+    async (req: Request, res: Response) => {
+        const payload = createAvailabilitySlotSchema.parse(req.body);
+        const slot = await technicianService.createTechnicianAvailabilitySlot(
+            req.user!.userId,
+            payload
+        );
+
+        res.status(201).json({
+            success: true,
+            data: slot,
+        });
+    }
+);
+
 export const updateAvailability = catchAsync(
     async (req: Request, res: Response) => {
-        const payload = updateAvailabilitySchema.parse(req.body);
-        const profile = await technicianService.updateTechnicianAvailability(
+        const payload = updateAvailabilitySlotSchema.parse(req.body);
+        const slot = await technicianService.updateTechnicianAvailabilitySlot(
             req.user!.userId,
+            req.params.slotId as string,
             payload
         );
 
         res.status(200).json({
             success: true,
-            message: "Availability updated successfully",
-            data: profile,
+            data: slot,
         });
     }
 );
 
-export const getBookings = catchAsync(async (req: Request, res: Response) => {
-    const query = technicianBookingQuerySchema.parse(req.query);
-    const result = await technicianService.getTechnicianBookings(
-        req.user!.userId,
-        query
-    );
-
-    res.status(200).json({
-        success: true,
-        message: "Bookings fetched successfully",
-        meta: result.meta,
-        data: result.bookings,
-    });
-});
-
-export const updateBookingStatus = catchAsync(
+export const deleteAvailability = catchAsync(
     async (req: Request, res: Response) => {
-        const payload = updateBookingStatusSchema.parse(req.body);
-        const booking = await technicianService.updateTechnicianBookingStatus(
+        const slot = await technicianService.deleteTechnicianAvailabilitySlot(
             req.user!.userId,
+            req.params.slotId as string
+        );
+
+        res.status(200).json({
+            success: true,
+            data: slot,
+        });
+    }
+);
+
+export const verifyTechnician = catchAsync(
+    async (req: Request, res: Response) => {
+        const payload = verifyTechnicianSchema.parse(req.body);
+        const technician = await technicianService.verifyTechnician(
             req.params.id as string,
             payload
         );
 
         res.status(200).json({
             success: true,
-            message: "Booking status updated successfully",
-            data: booking,
+            data: technician,
         });
     }
 );
-
-export const getServices = catchAsync(async (req: Request, res: Response) => {
-    const services = await technicianService.getTechnicianServices(
-        req.user!.userId
-    );
-
-    res.status(200).json({
-        success: true,
-        message: "Services fetched successfully",
-        data: services,
-    });
-});
-
-export const createService = catchAsync(async (req: Request, res: Response) => {
-    const payload = createServiceSchema.parse(req.body);
-    const service = await technicianService.createTechnicianService(
-        req.user!.userId,
-        payload
-    );
-
-    res.status(201).json({
-        success: true,
-        message: "Service created successfully",
-        data: service,
-    });
-});
-
-export const updateService = catchAsync(async (req: Request, res: Response) => {
-    const payload = updateServiceSchema.parse(req.body);
-    const service = await technicianService.updateTechnicianService(
-        req.user!.userId,
-        req.params.id as string,
-        payload
-    );
-
-    res.status(200).json({
-        success: true,
-        message: "Service updated successfully",
-        data: service,
-    });
-});
-
-export const deleteService = catchAsync(async (req: Request, res: Response) => {
-    const service = await technicianService.deleteTechnicianService(
-        req.user!.userId,
-        req.params.id as string
-    );
-
-    res.status(200).json({
-        success: true,
-        message: "Service deleted successfully",
-        data: service,
-    });
-});

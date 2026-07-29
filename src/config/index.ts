@@ -34,7 +34,7 @@ const config = {
     sp_prefix: process.env.SP_PREFIX || "SP",
     sp_return_url:
         process.env.SP_RETURN_URL ||
-        `${backendUrl}/api/payments/shurjopay/callback`,
+        `${backendUrl}/api/v1/payments/webhook`,
     node_env: process.env.NODE_ENV || "development",
     is_production: process.env.NODE_ENV === "production",
 };

@@ -1,10 +1,19 @@
 import bcrypt from "bcryptjs";
 import jwt, { SignOptions } from "jsonwebtoken";
+import { randomBytes, randomUUID } from "node:crypto";
 import { Role } from "../../../generated/prisma/enums.js";
 import config from "../../config/index.js";
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../utils/AppError.js";
-import { JwtPayload, LoginInput, RegisterInput, UpdateProfileInput } from "./auth.interface.js";
+import {
+    ChangePasswordInput,
+    ForgotPasswordInput,
+    JwtPayload,
+    LoginInput,
+    RegisterInput,
+    ResetPasswordInput,
+    UpdateMeInput,
+} from "./auth.interface.js";
 
 const userSelect = {
     id: true,
@@ -12,9 +21,19 @@ const userSelect = {
     email: true,
     phone: true,
     role: true,
-    status: true,
+    initials: true,
+    isActive: true,
     createdAt: true,
     updatedAt: true,
+};
+
+const getInitials = (name: string) => {
+    return name
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? "")
+        .join("");
 };
 
 const signToken = (payload: JwtPayload) => {
@@ -34,16 +53,28 @@ export const registerUser = async (payload: RegisterInput) => {
         throw new AppError("Email is already registered", 409);
     }
 
-    const hashedPassword = await bcrypt.hash(payload.password, 12);
+    if (payload.phone) {
+        const existingPhone = await prisma.user.findUnique({
+            where: { phone: payload.phone },
+        });
+
+        if (existingPhone) {
+            throw new AppError("Phone number is already registered", 409);
+        }
+    }
+
+    const passwordHash = await bcrypt.hash(payload.password, 12);
+    const initials = getInitials(payload.name);
 
     const user = await prisma.$transaction(async (tx) => {
         const createdUser = await tx.user.create({
             data: {
                 name: payload.name,
                 email: payload.email,
-                password: hashedPassword,
+                passwordHash,
                 phone: payload.phone,
                 role: payload.role as Role,
+                initials,
             },
             select: userSelect,
         });
@@ -51,7 +82,11 @@ export const registerUser = async (payload: RegisterInput) => {
         if (payload.role === "TECHNICIAN") {
             await tx.technicianProfile.create({
                 data: {
+                    id: randomUUID(),
                     userId: createdUser.id,
+                    trade: payload.trade || "General",
+                    initials,
+                    visitFee: 0,
                 },
             });
         }
@@ -73,7 +108,7 @@ export const loginUser = async (payload: LoginInput) => {
         where: { email: payload.email },
         select: {
             ...userSelect,
-            password: true,
+            passwordHash: true,
         },
     });
 
@@ -81,17 +116,20 @@ export const loginUser = async (payload: LoginInput) => {
         throw new AppError("Invalid email or password", 401);
     }
 
-    if (user.status === "BANNED") {
+    if (!user.isActive) {
         throw new AppError("Your account has been banned", 403);
     }
 
-    const isPasswordValid = await bcrypt.compare(payload.password, user.password);
+    const isPasswordValid = await bcrypt.compare(
+        payload.password,
+        user.passwordHash
+    );
 
     if (!isPasswordValid) {
         throw new AppError("Invalid email or password", 401);
     }
 
-    const { password, ...userWithoutPassword } = user;
+    const { passwordHash, ...userWithoutPassword } = user;
 
     const token = signToken({
         userId: user.id,
@@ -110,13 +148,16 @@ export const getCurrentUser = async (userId: string) => {
             technicianProfile: {
                 select: {
                     id: true,
+                    trade: true,
                     bio: true,
-                    skills: true,
-                    experienceYears: true,
-                    hourlyRate: true,
-                    location: true,
-                    avgRating: true,
-                    totalReviews: true,
+                    areaId: true,
+                    visitFee: true,
+                    experienceYrs: true,
+                    jobsCompleted: true,
+                    ratingAvg: true,
+                    reviewCount: true,
+                    online: true,
+                    verified: true,
                 },
             },
         },
@@ -126,33 +167,31 @@ export const getCurrentUser = async (userId: string) => {
         throw new AppError("User not found", 404);
     }
 
-    if (user.status === "BANNED") {
+    if (!user.isActive) {
         throw new AppError("Your account has been banned", 403);
     }
 
     return user;
 };
 
-export const updateUserProfile = async (
-    userId: string,
-    payload: UpdateProfileInput
-) => {
+export const updateMe = async (userId: string, payload: UpdateMeInput) => {
     const data: {
         name?: string;
         phone?: string;
-        password?: string;
+        initials?: string;
     } = {};
 
     if (payload.name !== undefined) {
         data.name = payload.name;
+        data.initials = payload.initials ?? getInitials(payload.name);
     }
 
     if (payload.phone !== undefined) {
         data.phone = payload.phone;
     }
 
-    if (payload.password) {
-        data.password = await bcrypt.hash(payload.password, 12);
+    if (payload.initials !== undefined && payload.name === undefined) {
+        data.initials = payload.initials;
     }
 
     return prisma.user.update({
@@ -163,15 +202,113 @@ export const updateUserProfile = async (
             technicianProfile: {
                 select: {
                     id: true,
+                    trade: true,
                     bio: true,
-                    skills: true,
-                    experienceYears: true,
-                    hourlyRate: true,
-                    location: true,
-                    avgRating: true,
-                    totalReviews: true,
+                    areaId: true,
+                    visitFee: true,
+                    experienceYrs: true,
+                    jobsCompleted: true,
+                    ratingAvg: true,
+                    reviewCount: true,
+                    online: true,
+                    verified: true,
                 },
             },
         },
     });
+};
+
+export const forgotPassword = async (payload: ForgotPasswordInput) => {
+    const user = await prisma.user.findUnique({
+        where: { email: payload.email },
+        select: { id: true, email: true },
+    });
+
+    // Always return success to avoid email enumeration
+    if (!user) {
+        return {
+            message: "If that email exists, a reset token has been issued",
+        };
+    }
+
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await prisma.passwordResetToken.create({
+        data: {
+            token,
+            userId: user.id,
+            expiresAt,
+        },
+    });
+
+    // No email provider wired — expose token in non-production for testing
+    if (config.node_env !== "production") {
+        return {
+            message: "Password reset token generated",
+            resetToken: token,
+            expiresAt,
+        };
+    }
+
+    return {
+        message: "If that email exists, a reset token has been issued",
+    };
+};
+
+export const resetPassword = async (payload: ResetPasswordInput) => {
+    const resetToken = await prisma.passwordResetToken.findUnique({
+        where: { token: payload.token },
+    });
+
+    if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
+        throw new AppError("Invalid or expired reset token", 400);
+    }
+
+    const passwordHash = await bcrypt.hash(payload.password, 12);
+
+    await prisma.$transaction([
+        prisma.user.update({
+            where: { id: resetToken.userId },
+            data: { passwordHash },
+        }),
+        prisma.passwordResetToken.update({
+            where: { id: resetToken.id },
+            data: { usedAt: new Date() },
+        }),
+    ]);
+
+    return { message: "Password reset successfully" };
+};
+
+export const changePassword = async (
+    userId: string,
+    payload: ChangePasswordInput
+) => {
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { passwordHash: true },
+    });
+
+    if (!user) {
+        throw new AppError("User not found", 404);
+    }
+
+    const isValid = await bcrypt.compare(
+        payload.currentPassword,
+        user.passwordHash
+    );
+
+    if (!isValid) {
+        throw new AppError("Current password is incorrect", 400);
+    }
+
+    const passwordHash = await bcrypt.hash(payload.newPassword, 12);
+
+    await prisma.user.update({
+        where: { id: userId },
+        data: { passwordHash },
+    });
+
+    return { message: "Password changed successfully" };
 };

@@ -14,14 +14,15 @@ const userSelect = {
     email: true,
     phone: true,
     role: true,
-    status: true,
+    initials: true,
+    isActive: true,
     createdAt: true,
     updatedAt: true,
     technicianProfile: {
         select: {
             id: true,
-            location: true,
-            avgRating: true,
+            trade: true,
+            ratingAvg: true,
         },
     },
     _count: {
@@ -34,10 +35,13 @@ const userSelect = {
 
 const adminBookingSelect = {
     id: true,
+    refCode: true,
     scheduledAt: true,
-    address: true,
     notes: true,
     status: true,
+    servicePrice: true,
+    visitFee: true,
+    totalAmount: true,
     createdAt: true,
     updatedAt: true,
     customer: {
@@ -51,7 +55,7 @@ const adminBookingSelect = {
     technician: {
         select: {
             id: true,
-            location: true,
+            trade: true,
             user: {
                 select: {
                     id: true,
@@ -79,18 +83,18 @@ const adminBookingSelect = {
             id: true,
             status: true,
             amount: true,
-            provider: true,
+            method: true,
         },
     },
 };
 
 export const getAllUsers = async (query: AdminUserQuery) => {
-    const { page, limit, role, status, search } = query;
+    const { page, limit, role, isActive, search } = query;
     const skip = (page - 1) * limit;
 
     const where: Prisma.UserWhereInput = {
         ...(role && { role }),
-        ...(status && { status }),
+        ...(isActive !== undefined && { isActive }),
         ...(search && {
             OR: [
                 { name: { contains: search, mode: "insensitive" } },
@@ -139,7 +143,7 @@ export const updateUserStatus = async (
 
     return prisma.user.update({
         where: { id: userId },
-        data: { status: payload.status },
+        data: { isActive: payload.isActive },
         select: userSelect,
     });
 };
@@ -176,4 +180,61 @@ export const getAllBookings = async (query: AdminBookingQuery) => {
 
 export const getAdminCategories = async () => {
     return getAllCategories();
+};
+
+export const getAdminStats = async () => {
+    const [
+        totalUsers,
+        totalCustomers,
+        totalTechnicians,
+        totalBookings,
+        completedBookings,
+        cancelledBookings,
+        declinedBookings,
+        revenueAgg,
+        pendingRefunds,
+        unverifiedTechnicians,
+    ] = await Promise.all([
+        prisma.user.count(),
+        prisma.user.count({ where: { role: "CUSTOMER" } }),
+        prisma.user.count({ where: { role: "TECHNICIAN" } }),
+        prisma.booking.count(),
+        prisma.booking.count({ where: { status: "COMPLETED" } }),
+        prisma.booking.count({ where: { status: "CANCELLED" } }),
+        prisma.booking.count({ where: { status: "DECLINED" } }),
+        prisma.payment.aggregate({
+            where: { status: "SUCCESS" },
+            _sum: { amount: true },
+            _count: { id: true },
+        }),
+        prisma.payment.count({
+            where: {
+                status: "SUCCESS",
+                booking: { status: "CANCELLED" },
+            },
+        }),
+        prisma.technicianProfile.count({ where: { verified: false } }),
+    ]);
+
+    return {
+        users: {
+            total: totalUsers,
+            customers: totalCustomers,
+            technicians: totalTechnicians,
+        },
+        jobs: {
+            total: totalBookings,
+            completed: completedBookings,
+            cancelled: cancelledBookings,
+            declined: declinedBookings,
+        },
+        revenue: {
+            totalBdt: revenueAgg._sum.amount || 0,
+            successfulPayments: revenueAgg._count.id,
+        },
+        disputes: {
+            cancelledPaidJobs: pendingRefunds,
+            unverifiedTechnicians,
+        },
+    };
 };

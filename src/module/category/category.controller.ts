@@ -11,8 +11,25 @@ export const getCategories = catchAsync(async (req: Request, res: Response) => {
 
     res.status(200).json({
         success: true,
-        message: "Categories fetched successfully",
         data: categories,
+    });
+});
+
+export const getCategory = catchAsync(async (req: Request, res: Response) => {
+    const category = await categoryService.getCategoryById(req.params.id as string);
+
+    res.status(200).json({
+        success: true,
+        data: category,
+    });
+});
+
+export const getAreas = catchAsync(async (req: Request, res: Response) => {
+    const areas = await categoryService.getAllAreas();
+
+    res.status(200).json({
+        success: true,
+        data: areas,
     });
 });
 
@@ -22,7 +39,6 @@ export const createCategory = catchAsync(async (req: Request, res: Response) => 
 
     res.status(201).json({
         success: true,
-        message: "Category created successfully",
         data: category,
     });
 });
@@ -36,7 +52,6 @@ export const updateCategory = catchAsync(async (req: Request, res: Response) => 
 
     res.status(200).json({
         success: true,
-        message: "Category updated successfully",
         data: category,
     });
 });
@@ -46,7 +61,6 @@ export const deleteCategory = catchAsync(async (req: Request, res: Response) => 
 
     res.status(200).json({
         success: true,
-        message: "Category deleted successfully",
         data: category,
     });
 });

@@ -1,12 +1,11 @@
 import { Router } from "express";
 import { authenticate } from "../../middleware/auth.js";
 import { requireCustomer } from "../../middleware/customer.js";
-import { createReview } from "./review.controller.js";
+import { createReview, deleteReview } from "./review.controller.js";
 
 const router = Router();
 
-router.use(authenticate, requireCustomer);
-
-router.post("/", createReview);
+router.post("/", authenticate, requireCustomer, createReview);
+router.delete("/:id", authenticate, deleteReview);
 
 export const reviewRoutes = router;

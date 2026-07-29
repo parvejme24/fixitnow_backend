@@ -1,24 +1,19 @@
 import { Router } from "express";
 import { authenticate } from "../../middleware/auth.js";
+import { requireAdmin } from "../../middleware/admin.js";
 import { requireCustomer } from "../../middleware/customer.js";
 import {
-    confirmPayment,
-    createPayment,
     getPaymentDetails,
-    getPayments,
-    shurjoPayCallback,
+    initiatePayment,
+    paymentWebhook,
+    refundPayment,
 } from "./payment.controller.js";
 
 const router = Router();
 
-router.get("/shurjopay/callback", shurjoPayCallback);
-router.post("/shurjopay/callback", shurjoPayCallback);
-
-router.use(authenticate, requireCustomer);
-
-router.post("/create", createPayment);
-router.post("/confirm", confirmPayment);
-router.get("/", getPayments);
-router.get("/:id", getPaymentDetails);
+router.post("/webhook", paymentWebhook);
+router.post("/initiate", authenticate, requireCustomer, initiatePayment);
+router.get("/:id", authenticate, getPaymentDetails);
+router.post("/:id/refund", authenticate, requireAdmin, refundPayment);
 
 export const paymentRoutes = router;

@@ -1,22 +1,15 @@
 import { z } from "zod";
-import { paginationSchema } from "../service/service.interface.js";
 
-export const createPaymentSchema = z.object({
+export const initiatePaymentSchema = z.object({
     bookingId: z.string().min(1, "Booking ID is required"),
-    provider: z.enum(["SSLCOMMERZ", "STRIPE", "SHURJOPAY"]),
+    method: z.enum(["BKASH", "NAGAD", "CARD"]),
 });
 
-export const confirmPaymentSchema = z.object({
+export const webhookPaymentSchema = z.object({
     paymentId: z.string().min(1, "Payment ID is required"),
-    val_id: z.string().optional(),
-    sessionId: z.string().optional(),
-    orderId: z.string().optional(),
+    status: z.enum(["SUCCESS", "FAILED", "CANCELLED"]),
+    providerTxnId: z.string().optional(),
 });
 
-export const paymentQuerySchema = paginationSchema.extend({
-    status: z.enum(["PENDING", "COMPLETED", "FAILED", "CANCELLED"]).optional(),
-});
-
-export type CreatePaymentInput = z.infer<typeof createPaymentSchema>;
-export type ConfirmPaymentInput = z.infer<typeof confirmPaymentSchema>;
-export type PaymentQuery = z.infer<typeof paymentQuerySchema>;
+export type InitiatePaymentInput = z.infer<typeof initiatePaymentSchema>;
+export type WebhookPaymentInput = z.infer<typeof webhookPaymentSchema>;
