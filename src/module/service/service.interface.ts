@@ -19,7 +19,6 @@ export const serviceQuerySchema = paginationSchema.extend({
 });
 
 export const createServiceSchema = z.object({
-    id: z.string().min(1, "Id is required"),
     categoryId: z.string().min(1, "Category is required"),
     title: z.string().min(2, "Title is required"),
     description: z.string().min(1, "Description is required"),

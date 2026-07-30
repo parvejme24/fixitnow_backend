@@ -1,13 +1,16 @@
 import { Request, Response } from "express";
 import config from "../../config/index.js";
 import { catchAsync } from "../../utils/catchAsync.js";
+import { AppError } from "../../utils/AppError.js";
 import {
+    authUserQuerySchema,
     changePasswordSchema,
     forgotPasswordSchema,
     loginSchema,
     registerSchema,
     resetPasswordSchema,
     updateMeSchema,
+    updateUserRoleSchema,
 } from "./auth.interface.js";
 import * as authService from "./auth.service.js";
 
@@ -63,8 +66,31 @@ export const getMe = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const updateMe = catchAsync(async (req: Request, res: Response) => {
-    const payload = updateMeSchema.parse(req.body);
-    const user = await authService.updateMe(req.user!.userId, payload);
+    const body = req.body ?? {};
+    const hasTextFields = Object.keys(body).some(
+        (key) => body[key] !== undefined && body[key] !== ""
+    );
+
+    let payload: {
+        name?: string;
+        phone?: string;
+        initials?: string;
+    } = {};
+
+    if (hasTextFields) {
+        payload = updateMeSchema.parse(body);
+    } else if (!req.file) {
+        throw new AppError(
+            "Provide profile fields and/or a profileImage file",
+            400
+        );
+    }
+
+    const user = await authService.updateMe(
+        req.user!.userId,
+        payload,
+        req.file
+    );
 
     res.status(200).json({
         success: true,
@@ -99,5 +125,30 @@ export const changePassword = catchAsync(async (req: Request, res: Response) => 
     res.status(200).json({
         success: true,
         data: result,
+    });
+});
+
+export const getUsers = catchAsync(async (req: Request, res: Response) => {
+    const query = authUserQuerySchema.parse(req.query);
+    const result = await authService.getAllUsers(query);
+
+    res.status(200).json({
+        success: true,
+        meta: result.meta,
+        data: result.users,
+    });
+});
+
+export const updateUserRole = catchAsync(async (req: Request, res: Response) => {
+    const payload = updateUserRoleSchema.parse(req.body);
+    const user = await authService.updateUserRole(
+        req.params.id as string,
+        payload,
+        req.user!.userId
+    );
+
+    res.status(200).json({
+        success: true,
+        data: user,
     });
 });

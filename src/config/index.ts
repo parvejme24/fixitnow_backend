@@ -35,6 +35,18 @@ const config = {
     sp_return_url:
         process.env.SP_RETURN_URL ||
         `${backendUrl}/api/v1/payments/webhook`,
+    smtp: {
+        host: process.env.SMTP_HOST || "smtp.gmail.com",
+        port: Number(process.env.SMTP_PORT) || 587,
+        user: process.env.SMTP_USER || "",
+        pass: process.env.SMTP_PASS || "",
+        from: process.env.EMAIL_FROM || process.env.SMTP_USER || "",
+    },
+    cloudinary: {
+        cloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
+        apiKey: process.env.CLOUDINARY_API_KEY || "",
+        apiSecret: process.env.CLOUDINARY_API_SECRET || "",
+    },
     node_env: process.env.NODE_ENV || "development",
     is_production: process.env.NODE_ENV === "production",
 };

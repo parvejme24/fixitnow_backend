@@ -1,11 +1,19 @@
 import bcrypt from "bcryptjs";
 import jwt, { SignOptions } from "jsonwebtoken";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomBytes } from "node:crypto";
+import { Prisma } from "../../../generated/prisma/client.js";
 import { Role } from "../../../generated/prisma/enums.js";
 import config from "../../config/index.js";
+import { uploadProfileImage } from "../../lib/cloudinary.js";
+import {
+    sendPasswordChangedEmail,
+    sendPasswordResetEmail,
+    sendRoleChangedEmail,
+} from "../../lib/email.js";
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../utils/AppError.js";
 import {
+    AuthUserQuery,
     ChangePasswordInput,
     ForgotPasswordInput,
     JwtPayload,
@@ -13,6 +21,7 @@ import {
     RegisterInput,
     ResetPasswordInput,
     UpdateMeInput,
+    UpdateUserRoleInput,
 } from "./auth.interface.js";
 
 const userSelect = {
@@ -22,9 +31,24 @@ const userSelect = {
     phone: true,
     role: true,
     initials: true,
+    profileImage: true,
     isActive: true,
     createdAt: true,
     updatedAt: true,
+};
+
+const technicianProfileSelect = {
+    id: true,
+    trade: true,
+    bio: true,
+    areaId: true,
+    visitFee: true,
+    experienceYrs: true,
+    jobsCompleted: true,
+    ratingAvg: true,
+    reviewCount: true,
+    online: true,
+    verified: true,
 };
 
 const getInitials = (name: string) => {
@@ -82,7 +106,6 @@ export const registerUser = async (payload: RegisterInput) => {
         if (payload.role === "TECHNICIAN") {
             await tx.technicianProfile.create({
                 data: {
-                    id: randomUUID(),
                     userId: createdUser.id,
                     trade: payload.trade || "General",
                     initials,
@@ -145,21 +168,7 @@ export const getCurrentUser = async (userId: string) => {
         where: { id: userId },
         select: {
             ...userSelect,
-            technicianProfile: {
-                select: {
-                    id: true,
-                    trade: true,
-                    bio: true,
-                    areaId: true,
-                    visitFee: true,
-                    experienceYrs: true,
-                    jobsCompleted: true,
-                    ratingAvg: true,
-                    reviewCount: true,
-                    online: true,
-                    verified: true,
-                },
-            },
+            technicianProfile: { select: technicianProfileSelect },
         },
     });
 
@@ -174,11 +183,16 @@ export const getCurrentUser = async (userId: string) => {
     return user;
 };
 
-export const updateMe = async (userId: string, payload: UpdateMeInput) => {
+export const updateMe = async (
+    userId: string,
+    payload: UpdateMeInput,
+    file?: Express.Multer.File
+) => {
     const data: {
         name?: string;
         phone?: string;
         initials?: string;
+        profileImage?: string;
     } = {};
 
     if (payload.name !== undefined) {
@@ -194,26 +208,21 @@ export const updateMe = async (userId: string, payload: UpdateMeInput) => {
         data.initials = payload.initials;
     }
 
+    if (file) {
+        const uploaded = await uploadProfileImage(file.buffer);
+        data.profileImage = uploaded.url;
+    }
+
+    if (Object.keys(data).length === 0) {
+        throw new AppError("At least one field or profile image is required", 400);
+    }
+
     return prisma.user.update({
         where: { id: userId },
         data,
         select: {
             ...userSelect,
-            technicianProfile: {
-                select: {
-                    id: true,
-                    trade: true,
-                    bio: true,
-                    areaId: true,
-                    visitFee: true,
-                    experienceYrs: true,
-                    jobsCompleted: true,
-                    ratingAvg: true,
-                    reviewCount: true,
-                    online: true,
-                    verified: true,
-                },
-            },
+            technicianProfile: { select: technicianProfileSelect },
         },
     });
 };
@@ -221,13 +230,13 @@ export const updateMe = async (userId: string, payload: UpdateMeInput) => {
 export const forgotPassword = async (payload: ForgotPasswordInput) => {
     const user = await prisma.user.findUnique({
         where: { email: payload.email },
-        select: { id: true, email: true },
+        select: { id: true, email: true, name: true },
     });
 
     // Always return success to avoid email enumeration
     if (!user) {
         return {
-            message: "If that email exists, a reset token has been issued",
+            message: "If that email exists, a reset link has been sent",
         };
     }
 
@@ -242,23 +251,33 @@ export const forgotPassword = async (payload: ForgotPasswordInput) => {
         },
     });
 
-    // No email provider wired — expose token in non-production for testing
-    if (config.node_env !== "production") {
-        return {
-            message: "Password reset token generated",
-            resetToken: token,
-            expiresAt,
-        };
+    const resetUrl = `${config.app_url}/reset-password?token=${token}`;
+
+    await sendPasswordResetEmail(user.email, user.name, resetUrl);
+
+    const response: {
+        message: string;
+        resetToken?: string;
+        expiresAt?: Date;
+    } = {
+        message: "If that email exists, a reset link has been sent",
+    };
+
+    // Helpful for local testing without checking inbox
+    if (!config.is_production) {
+        response.resetToken = token;
+        response.expiresAt = expiresAt;
     }
 
-    return {
-        message: "If that email exists, a reset token has been issued",
-    };
+    return response;
 };
 
 export const resetPassword = async (payload: ResetPasswordInput) => {
     const resetToken = await prisma.passwordResetToken.findUnique({
         where: { token: payload.token },
+        include: {
+            user: { select: { id: true, email: true, name: true } },
+        },
     });
 
     if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
@@ -278,6 +297,11 @@ export const resetPassword = async (payload: ResetPasswordInput) => {
         }),
     ]);
 
+    await sendPasswordChangedEmail(
+        resetToken.user.email,
+        resetToken.user.name
+    );
+
     return { message: "Password reset successfully" };
 };
 
@@ -287,7 +311,7 @@ export const changePassword = async (
 ) => {
     const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { passwordHash: true },
+        select: { passwordHash: true, email: true, name: true },
     });
 
     if (!user) {
@@ -310,5 +334,116 @@ export const changePassword = async (
         data: { passwordHash },
     });
 
+    await sendPasswordChangedEmail(user.email, user.name);
+
     return { message: "Password changed successfully" };
+};
+
+export const getAllUsers = async (query: AuthUserQuery) => {
+    const { page, limit, role, isActive, search } = query;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.UserWhereInput = {
+        ...(role && { role }),
+        ...(isActive !== undefined && { isActive }),
+        ...(search && {
+            OR: [
+                { name: { contains: search, mode: "insensitive" } },
+                { email: { contains: search, mode: "insensitive" } },
+                { phone: { contains: search, mode: "insensitive" } },
+            ],
+        }),
+    };
+
+    const [users, total] = await Promise.all([
+        prisma.user.findMany({
+            where,
+            select: {
+                ...userSelect,
+                technicianProfile: {
+                    select: {
+                        id: true,
+                        trade: true,
+                        ratingAvg: true,
+                        verified: true,
+                    },
+                },
+            },
+            skip,
+            take: limit,
+            orderBy: { createdAt: "desc" },
+        }),
+        prisma.user.count({ where }),
+    ]);
+
+    return {
+        users,
+        meta: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+        },
+    };
+};
+
+export const updateUserRole = async (
+    userId: string,
+    payload: UpdateUserRoleInput,
+    adminId: string
+) => {
+    if (userId === adminId) {
+        throw new AppError("You cannot change your own role", 400);
+    }
+
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { technicianProfile: true },
+    });
+
+    if (!user) {
+        throw new AppError("User not found", 404);
+    }
+
+    if (user.role === payload.role) {
+        throw new AppError(`User already has role ${payload.role}`, 400);
+    }
+
+    const oldRole = user.role;
+    const newRole = payload.role as Role;
+
+    const updated = await prisma.$transaction(async (tx) => {
+        const updatedUser = await tx.user.update({
+            where: { id: userId },
+            data: { role: newRole },
+            select: {
+                ...userSelect,
+                technicianProfile: {
+                    select: {
+                        id: true,
+                        trade: true,
+                        ratingAvg: true,
+                        verified: true,
+                    },
+                },
+            },
+        });
+
+        if (newRole === "TECHNICIAN" && !user.technicianProfile) {
+            await tx.technicianProfile.create({
+                data: {
+                    userId,
+                    trade: payload.trade || "General",
+                    initials: user.initials || getInitials(user.name),
+                    visitFee: 0,
+                },
+            });
+        }
+
+        return updatedUser;
+    });
+
+    await sendRoleChangedEmail(user.email, user.name, oldRole, newRole);
+
+    return updated;
 };

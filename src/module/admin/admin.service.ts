@@ -1,7 +1,6 @@
 import { Prisma } from "../../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../utils/AppError.js";
-import { getAllCategories } from "../category/category.service.js";
 import {
     AdminBookingQuery,
     AdminUserQuery,
@@ -15,6 +14,7 @@ const userSelect = {
     phone: true,
     role: true,
     initials: true,
+    profileImage: true,
     isActive: true,
     createdAt: true,
     updatedAt: true,
@@ -176,10 +176,6 @@ export const getAllBookings = async (query: AdminBookingQuery) => {
             totalPages: Math.ceil(total / limit),
         },
     };
-};
-
-export const getAdminCategories = async () => {
-    return getAllCategories();
 };
 
 export const getAdminStats = async () => {

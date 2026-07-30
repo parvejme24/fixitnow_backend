@@ -1,18 +1,42 @@
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../utils/AppError.js";
-import { CreateCategoryInput, UpdateCategoryInput } from "./category.interface.js";
+import {
+    CreateCategoryInput,
+    ToggleCategoryVisibilityInput,
+    UpdateCategoryInput,
+} from "./category.interface.js";
 
 const categorySelect = {
     id: true,
     name: true,
     slug: true,
+    icon: true,
+    isVisible: true,
     sortOrder: true,
     jobsDone: true,
     createdAt: true,
+    updatedAt: true,
 };
 
-export const getAllCategories = async () => {
+const mapCategory = <
+    T extends {
+        _count: { services: number; technicianCategories: number };
+    },
+>(
+    category: T
+) => {
+    const { _count, ...rest } = category;
+    return {
+        ...rest,
+        serviceCount: _count.services,
+        technicianCount: _count.technicianCategories,
+    };
+};
+
+/** Public: only visible categories (customer cards / search) */
+export const getAllCategories = async (options?: { includeHidden?: boolean }) => {
     const categories = await prisma.category.findMany({
+        where: options?.includeHidden ? undefined : { isVisible: true },
         select: {
             ...categorySelect,
             _count: {
@@ -25,16 +49,18 @@ export const getAllCategories = async () => {
         orderBy: { sortOrder: "asc" },
     });
 
-    return categories.map(({ _count, ...category }) => ({
-        ...category,
-        serviceCount: _count.services,
-        technicianCount: _count.technicianCategories,
-    }));
+    return categories.map(mapCategory);
 };
 
-export const getCategoryById = async (id: string) => {
-    const category = await prisma.category.findUnique({
-        where: { id },
+export const getCategoryById = async (
+    id: string,
+    options?: { includeHidden?: boolean }
+) => {
+    const category = await prisma.category.findFirst({
+        where: {
+            id,
+            ...(options?.includeHidden ? {} : { isVisible: true }),
+        },
         select: {
             ...categorySelect,
             _count: {
@@ -50,12 +76,7 @@ export const getCategoryById = async (id: string) => {
         throw new AppError("Category not found", 404);
     }
 
-    const { _count, ...rest } = category;
-    return {
-        ...rest,
-        serviceCount: _count.services,
-        technicianCount: _count.technicianCategories,
-    };
+    return mapCategory(category);
 };
 
 export const getAllAreas = async () => {
@@ -72,16 +93,22 @@ export const getAllAreas = async () => {
 export const createCategory = async (payload: CreateCategoryInput) => {
     const existingCategory = await prisma.category.findFirst({
         where: {
-            OR: [{ id: payload.id }, { name: payload.name }, { slug: payload.slug }],
+            OR: [{ name: payload.name }, { slug: payload.slug }],
         },
     });
 
     if (existingCategory) {
-        throw new AppError("Category with this id, name or slug already exists", 409);
+        throw new AppError("Category with this name or slug already exists", 409);
     }
 
     return prisma.category.create({
-        data: payload,
+        data: {
+            name: payload.name,
+            slug: payload.slug,
+            icon: payload.icon,
+            isVisible: payload.isVisible ?? true,
+            sortOrder: payload.sortOrder,
+        },
         select: categorySelect,
     });
 };
@@ -120,6 +147,44 @@ export const updateCategory = async (id: string, payload: UpdateCategoryInput) =
         data: payload,
         select: categorySelect,
     });
+};
+
+/** Hide / unhide category on customer UI cards */
+export const toggleCategoryVisibility = async (
+    id: string,
+    payload: ToggleCategoryVisibilityInput
+) => {
+    const category = await prisma.category.findUnique({ where: { id } });
+
+    if (!category) {
+        throw new AppError("Category not found", 404);
+    }
+
+    return prisma.category.update({
+        where: { id },
+        data: { isVisible: payload.isVisible },
+        select: categorySelect,
+    });
+};
+
+/** Category dashboard cards: total, live in search, services, jobs all-time */
+export const getCategoryStats = async () => {
+    const [categories, liveInSearch, servicesListed, jobsAgg] =
+        await Promise.all([
+            prisma.category.count(),
+            prisma.category.count({ where: { isVisible: true } }),
+            prisma.service.count({ where: { isActive: true } }),
+            prisma.category.aggregate({
+                _sum: { jobsDone: true },
+            }),
+        ]);
+
+    return {
+        categories,
+        liveInSearch,
+        servicesListed,
+        jobsAllTime: jobsAgg._sum.jobsDone || 0,
+    };
 };
 
 export const deleteCategory = async (id: string) => {

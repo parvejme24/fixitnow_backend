@@ -39,19 +39,18 @@ const AREA_NAMES = [
 ] as const;
 
 const CATEGORIES = [
-  { id: "c1", name: "Plumbing", sortOrder: 1 },
-  { id: "c2", name: "Electrical", sortOrder: 2 },
-  { id: "c3", name: "AC & Cooling", sortOrder: 3 },
-  { id: "c4", name: "Cleaning", sortOrder: 4 },
-  { id: "c5", name: "Painting", sortOrder: 5 },
-  { id: "c6", name: "Carpentry", sortOrder: 6 },
-  { id: "c7", name: "Appliance Repair", sortOrder: 7 },
-  { id: "c8", name: "Pest Control", sortOrder: 8 },
+  { name: "Plumbing", icon: "🔧", isVisible: true, sortOrder: 1 },
+  { name: "Electrical", icon: "⚡", isVisible: true, sortOrder: 2 },
+  { name: "AC & Cooling", icon: "❄️", isVisible: true, sortOrder: 3 },
+  { name: "Cleaning", icon: "🧹", isVisible: true, sortOrder: 4 },
+  { name: "Painting", icon: "🎨", isVisible: true, sortOrder: 5 },
+  { name: "Carpentry", icon: "🪚", isVisible: true, sortOrder: 6 },
+  { name: "Appliance Repair", icon: "🔌", isVisible: true, sortOrder: 7 },
+  { name: "Pest Control", icon: "🐛", isVisible: true, sortOrder: 8 },
 ] as const;
 
 const SERVICES: {
-  id: string;
-  categoryId: string;
+  categorySlug: string;
   title: string;
   description: string;
   price: number;
@@ -64,8 +63,7 @@ const SERVICES: {
 }[] = [
   // Plumbing
   {
-    id: "s1",
-    categoryId: "c1",
+    categorySlug: "plumbing",
     title: "Kitchen Sink & Tap Fix",
     description:
       "Repair leaking taps, replace cartridges, and clear minor kitchen sink blockages in Dhaka apartments.",
@@ -78,8 +76,7 @@ const SERVICES: {
     reviewCount: 128,
   },
   {
-    id: "s2",
-    categoryId: "c1",
+    categorySlug: "plumbing",
     title: "Bathroom Leak & Pipe Repair",
     description:
       "Locate and fix bathroom pipe leaks, shower fittings, and WC flush issues with proper sealing.",
@@ -93,8 +90,7 @@ const SERVICES: {
   },
   // Electrical
   {
-    id: "s3",
-    categoryId: "c2",
+    categorySlug: "electrical",
     title: "Fan & Light Installation",
     description:
       "Install or replace ceiling fans, LED lights, and switches with safe wiring checks.",
@@ -107,8 +103,7 @@ const SERVICES: {
     reviewCount: 210,
   },
   {
-    id: "s4",
-    categoryId: "c2",
+    categorySlug: "electrical",
     title: "MCB & Wiring Fault Diagnosis",
     description:
       "Diagnose short circuits, trip issues, and fix household wiring faults for flats and duplexes.",
@@ -122,8 +117,7 @@ const SERVICES: {
   },
   // AC & Cooling
   {
-    id: "s5",
-    categoryId: "c3",
+    categorySlug: "ac-and-cooling",
     title: "AC Deep Clean & Servicing",
     description:
       "Full indoor/outdoor unit cleaning, gas pressure check, and filter wash for split ACs.",
@@ -136,8 +130,7 @@ const SERVICES: {
     reviewCount: 305,
   },
   {
-    id: "s6",
-    categoryId: "c3",
+    categorySlug: "ac-and-cooling",
     title: "AC Gas Refill & Cooling Fix",
     description:
       "Leak check, gas refill, and cooling performance restore for 1–2 ton split ACs.",
@@ -151,8 +144,7 @@ const SERVICES: {
   },
   // Cleaning
   {
-    id: "s7",
-    categoryId: "c4",
+    categorySlug: "cleaning",
     title: "2BHK Deep Home Cleaning",
     description:
       "Kitchen, bathroom, and floor deep clean for typical Dhaka 2BHK flats including balcony wipe-down.",
@@ -165,8 +157,7 @@ const SERVICES: {
     reviewCount: 174,
   },
   {
-    id: "s8",
-    categoryId: "c4",
+    categorySlug: "cleaning",
     title: "Kitchen & Bathroom Deep Clean",
     description:
       "Degrease kitchen surfaces, descale bathrooms, and sanitize high-touch areas.",
@@ -180,8 +171,7 @@ const SERVICES: {
   },
   // Painting
   {
-    id: "s9",
-    categoryId: "c5",
+    categorySlug: "painting",
     title: "Single Room Wall Paint",
     description:
       "Prep, putty touch-ups, and two coats of emulsion for one standard bedroom or living room.",
@@ -194,8 +184,7 @@ const SERVICES: {
     reviewCount: 58,
   },
   {
-    id: "s10",
-    categoryId: "c5",
+    categorySlug: "painting",
     title: "Door & Window Touch-up Paint",
     description:
       "Sand, prime, and repaint wooden doors, frames, and window sills with durable enamel.",
@@ -209,8 +198,7 @@ const SERVICES: {
   },
   // Carpentry
   {
-    id: "s11",
-    categoryId: "c6",
+    categorySlug: "carpentry",
     title: "Furniture Assembly & Fit",
     description:
       "Assemble flat-pack furniture, shelves, and wardrobe fittings with wall anchoring where needed.",
@@ -223,8 +211,7 @@ const SERVICES: {
     reviewCount: 93,
   },
   {
-    id: "s12",
-    categoryId: "c6",
+    categorySlug: "carpentry",
     title: "Door Hinge & Lock Repair",
     description:
       "Fix sticking doors, replace hinges, and install or repair cylinder locks for home security.",
@@ -238,8 +225,7 @@ const SERVICES: {
   },
   // Appliance Repair
   {
-    id: "s13",
-    categoryId: "c7",
+    categorySlug: "appliance-repair",
     title: "Washing Machine Repair",
     description:
       "Diagnose drain, spin, and power issues for top-load and front-load washing machines.",
@@ -252,8 +238,7 @@ const SERVICES: {
     reviewCount: 119,
   },
   {
-    id: "s14",
-    categoryId: "c7",
+    categorySlug: "appliance-repair",
     title: "Fridge Cooling & Thermostat Fix",
     description:
       "Restore fridge cooling, check compressor, and replace faulty thermostat or door seal.",
@@ -267,8 +252,7 @@ const SERVICES: {
   },
   // Pest Control
   {
-    id: "s15",
-    categoryId: "c8",
+    categorySlug: "pest-control",
     title: "Cockroach & Ant Control",
     description:
       "Targeted gel and spray treatment for kitchens and bathrooms with follow-up guidance.",
@@ -281,8 +265,7 @@ const SERVICES: {
     reviewCount: 142,
   },
   {
-    id: "s16",
-    categoryId: "c8",
+    categorySlug: "pest-control",
     title: "Mosquito Fogging (Flat)",
     description:
       "Indoor fogging for mosquitoes and flying insects suitable for flats up to 1200 sq ft.",
@@ -297,7 +280,6 @@ const SERVICES: {
 ];
 
 type TechSeed = {
-  id: string;
   name: string;
   email: string;
   phone: string;
@@ -311,13 +293,12 @@ type TechSeed = {
   online: boolean;
   verified: boolean;
   bio: string;
-  categoryIds: string[];
+  categorySlugs: string[];
   skills: string[];
 };
 
 const TECHNICIANS: TechSeed[] = [
   {
-    id: "t1",
     name: "Rakib",
     email: "rakib@fixitnow.test",
     phone: "01711000001",
@@ -331,11 +312,10 @@ const TECHNICIANS: TechSeed[] = [
     online: true,
     verified: true,
     bio: "Trusted plumber for flats in Dhanmondi and nearby lakeside areas.",
-    categoryIds: ["c1"],
+    categorySlugs: ["plumbing"],
     skills: ["Pipe repair", "Tap replacement", "Drain clearing", "WC install"],
   },
   {
-    id: "t2",
     name: "Shamim",
     email: "shamim@fixitnow.test",
     phone: "01711000002",
@@ -349,11 +329,10 @@ const TECHNICIANS: TechSeed[] = [
     online: true,
     verified: true,
     bio: "Licensed electrician specializing in household wiring and fan installs.",
-    categoryIds: ["c2"],
+    categorySlugs: ["electrical"],
     skills: ["Wiring", "MCB change", "Fan install", "Switchboard"],
   },
   {
-    id: "t3",
     name: "Nasima",
     email: "nasima@fixitnow.test",
     phone: "01711000003",
@@ -367,11 +346,10 @@ const TECHNICIANS: TechSeed[] = [
     online: true,
     verified: true,
     bio: "Detail-oriented home cleaner for kitchens, baths, and full-flat deep cleans.",
-    categoryIds: ["c4"],
+    categorySlugs: ["cleaning"],
     skills: ["Deep cleaning", "Kitchen degrease", "Bathroom sanitize"],
   },
   {
-    id: "t4",
     name: "Jubayer",
     email: "jubayer@fixitnow.test",
     phone: "01711000004",
@@ -385,11 +363,10 @@ const TECHNICIANS: TechSeed[] = [
     online: true,
     verified: true,
     bio: "AC specialist for split units — servicing, gas, and cooling repairs.",
-    categoryIds: ["c3", "c7"],
+    categorySlugs: ["ac-and-cooling", "appliance-repair"],
     skills: ["AC servicing", "Gas refill", "Filter clean", "Thermostat"],
   },
   {
-    id: "t5",
     name: "Milon",
     email: "milon@fixitnow.test",
     phone: "01711000005",
@@ -403,11 +380,10 @@ const TECHNICIANS: TechSeed[] = [
     online: false,
     verified: true,
     bio: "Interior painter for rooms, doors, and neat touch-up work in Uttara.",
-    categoryIds: ["c5"],
+    categorySlugs: ["painting"],
     skills: ["Wall paint", "Putty work", "Enamel paint"],
   },
   {
-    id: "t6",
     name: "Farhana",
     email: "farhana@fixitnow.test",
     phone: "01711000006",
@@ -421,11 +397,10 @@ const TECHNICIANS: TechSeed[] = [
     online: true,
     verified: true,
     bio: "Safe pest treatments for cockroaches, ants, and mosquitoes in flats.",
-    categoryIds: ["c8"],
+    categorySlugs: ["pest-control"],
     skills: ["Gel treatment", "Fogging", "Ant control", "Kitchen pests"],
   },
   {
-    id: "t7",
     name: "Tanvir",
     email: "tanvir@fixitnow.test",
     phone: "01711000007",
@@ -439,11 +414,10 @@ const TECHNICIANS: TechSeed[] = [
     online: true,
     verified: true,
     bio: "Carpenter for furniture assembly, doors, and custom shelf fitting.",
-    categoryIds: ["c6"],
+    categorySlugs: ["carpentry"],
     skills: ["Furniture assembly", "Door repair", "Lock fitting"],
   },
   {
-    id: "t8",
     name: "Imran",
     email: "imran@fixitnow.test",
     phone: "01711000008",
@@ -457,11 +431,10 @@ const TECHNICIANS: TechSeed[] = [
     online: false,
     verified: false,
     bio: "Repairs washing machines and fridges with on-site diagnosis.",
-    categoryIds: ["c7", "c2"],
+    categorySlugs: ["appliance-repair", "electrical"],
     skills: ["Washing machine", "Fridge repair", "Basic electrical"],
   },
   {
-    id: "t9",
     name: "Sohel",
     email: "sohel@fixitnow.test",
     phone: "01711000009",
@@ -475,7 +448,7 @@ const TECHNICIANS: TechSeed[] = [
     online: true,
     verified: true,
     bio: "Veteran plumber covering Old Dhaka emergencies and pipe overhauls.",
-    categoryIds: ["c1", "c6"],
+    categorySlugs: ["plumbing", "carpentry"],
     skills: ["Emergency plumbing", "Pipe welding", "Tank overflow", "Fixture fit"],
   },
 ];
@@ -521,55 +494,61 @@ async function main() {
   }
 
   // ── 3. Categories ─────────────────────────────────────────
+  const categoryBySlug = new Map<string, string>();
   for (const cat of CATEGORIES) {
-    await prisma.category.upsert({
-      where: { id: cat.id },
+    const slug = slugify(cat.name);
+    const category = await prisma.category.upsert({
+      where: { slug },
       update: {
         name: cat.name,
-        slug: slugify(cat.name),
+        icon: cat.icon,
+        isVisible: cat.isVisible,
         sortOrder: cat.sortOrder,
       },
       create: {
-        id: cat.id,
         name: cat.name,
-        slug: slugify(cat.name),
+        slug,
+        icon: cat.icon,
+        isVisible: cat.isVisible,
         sortOrder: cat.sortOrder,
       },
     });
+    categoryBySlug.set(slug, category.id);
   }
 
   // ── 4. Services ───────────────────────────────────────────
   for (const svc of SERVICES) {
-    await prisma.service.upsert({
-      where: { id: svc.id },
-      update: {
-        categoryId: svc.categoryId,
-        title: svc.title,
-        description: svc.description,
-        price: svc.price,
-        duration: svc.duration,
-        tag: svc.tag,
-        isFeatured: svc.isFeatured,
-        sortOrder: svc.sortOrder,
-        ratingAvg: svc.ratingAvg,
-        reviewCount: svc.reviewCount,
-        isActive: true,
-      },
-      create: {
-        id: svc.id,
-        categoryId: svc.categoryId,
-        title: svc.title,
-        description: svc.description,
-        price: svc.price,
-        duration: svc.duration,
-        tag: svc.tag,
-        isFeatured: svc.isFeatured,
-        sortOrder: svc.sortOrder,
-        ratingAvg: svc.ratingAvg,
-        reviewCount: svc.reviewCount,
-        isActive: true,
-      },
+    const categoryId = categoryBySlug.get(svc.categorySlug);
+    if (!categoryId) {
+      throw new Error(`Missing category for slug: ${svc.categorySlug}`);
+    }
+
+    const existing = await prisma.service.findFirst({
+      where: { title: svc.title },
     });
+
+    const data = {
+      categoryId,
+      title: svc.title,
+      description: svc.description,
+      price: svc.price,
+      duration: svc.duration,
+      tag: svc.tag,
+      isFeatured: svc.isFeatured,
+      sortOrder: svc.sortOrder,
+      ratingAvg: svc.ratingAvg,
+      reviewCount: svc.reviewCount,
+      isActive: true,
+    };
+
+    if (existing) {
+      await prisma.service.update({
+        where: { id: existing.id },
+        data,
+      });
+    } else {
+      await prisma.service.create({ data });
+    }
   }
 
   // ── 5. Technicians (users + profiles) ─────────────────────
@@ -598,49 +577,50 @@ async function main() {
       },
     });
 
-    await prisma.technicianProfile.upsert({
-      where: { id: tech.id },
-      update: {
-        userId: user.id,
-        trade: tech.trade,
-        areaId,
-        bio: tech.bio,
-        initials: tech.initials,
-        visitFee: tech.visitFee,
-        experienceYrs: tech.experienceYrs,
-        jobsCompleted: tech.jobsCompleted,
-        ratingAvg: tech.ratingAvg,
-        online: tech.online,
-        verified: tech.verified,
-      },
-      create: {
-        id: tech.id,
-        userId: user.id,
-        trade: tech.trade,
-        areaId,
-        bio: tech.bio,
-        initials: tech.initials,
-        visitFee: tech.visitFee,
-        experienceYrs: tech.experienceYrs,
-        jobsCompleted: tech.jobsCompleted,
-        ratingAvg: tech.ratingAvg,
-        online: tech.online,
-        verified: tech.verified,
-      },
+    const profileData = {
+      userId: user.id,
+      trade: tech.trade,
+      areaId,
+      bio: tech.bio,
+      initials: tech.initials,
+      visitFee: tech.visitFee,
+      experienceYrs: tech.experienceYrs,
+      jobsCompleted: tech.jobsCompleted,
+      ratingAvg: tech.ratingAvg,
+      online: tech.online,
+      verified: tech.verified,
+    };
+
+    const existingProfile = await prisma.technicianProfile.findUnique({
+      where: { userId: user.id },
     });
 
+    const profile = existingProfile
+      ? await prisma.technicianProfile.update({
+          where: { userId: user.id },
+          data: profileData,
+        })
+      : await prisma.technicianProfile.create({
+          data: profileData,
+        });
+
     // Categories
-    for (const categoryId of tech.categoryIds) {
+    for (const categorySlug of tech.categorySlugs) {
+      const categoryId = categoryBySlug.get(categorySlug);
+      if (!categoryId) {
+        throw new Error(`Missing category for slug: ${categorySlug}`);
+      }
+
       await prisma.technicianCategory.upsert({
         where: {
           technicianId_categoryId: {
-            technicianId: tech.id,
+            technicianId: profile.id,
             categoryId,
           },
         },
         update: {},
         create: {
-          technicianId: tech.id,
+          technicianId: profile.id,
           categoryId,
         },
       });
@@ -651,13 +631,13 @@ async function main() {
       await prisma.technicianSkill.upsert({
         where: {
           technicianId_name: {
-            technicianId: tech.id,
+            technicianId: profile.id,
             name: skillName,
           },
         },
         update: {},
         create: {
-          technicianId: tech.id,
+          technicianId: profile.id,
           name: skillName,
         },
       });
@@ -672,7 +652,7 @@ async function main() {
         await prisma.availabilitySlot.upsert({
           where: {
             technicianId_date_startTime: {
-              technicianId: tech.id,
+              technicianId: profile.id,
               date,
               startTime: slot.startTime,
             },
@@ -682,7 +662,7 @@ async function main() {
             isBooked: false,
           },
           create: {
-            technicianId: tech.id,
+            technicianId: profile.id,
             date,
             startTime: slot.startTime,
             endTime: slot.endTime,

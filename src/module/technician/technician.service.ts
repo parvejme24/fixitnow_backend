@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { Prisma } from "../../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../utils/AppError.js";
@@ -96,7 +95,6 @@ export const getTechnicianProfileByUserId = async (userId: string) => {
 
     return prisma.technicianProfile.create({
         data: {
-            id: randomUUID(),
             userId,
             trade: "General",
             initials: getInitials(user.name),

@@ -132,14 +132,6 @@ export const createService = async (payload: CreateServiceInput) => {
         throw new AppError("Category not found", 404);
     }
 
-    const existing = await prisma.service.findUnique({
-        where: { id: payload.id },
-    });
-
-    if (existing) {
-        throw new AppError("Service with this id already exists", 409);
-    }
-
     return prisma.service.create({
         data: {
             ...payload,

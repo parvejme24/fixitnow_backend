@@ -44,15 +44,6 @@ export const getBookings = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-export const getCategories = catchAsync(async (req: Request, res: Response) => {
-    const categories = await adminService.getAdminCategories();
-
-    res.status(200).json({
-        success: true,
-        data: categories,
-    });
-});
-
 export const getStats = catchAsync(async (req: Request, res: Response) => {
     const stats = await adminService.getAdminStats();
 

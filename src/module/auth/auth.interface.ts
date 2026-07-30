@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { paginationSchema } from "../service/service.interface.js";
 
 export const registerSchema = z
     .object({
@@ -32,9 +33,12 @@ export const updateMeSchema = z
         phone: z.string().optional(),
         initials: z.string().min(1).max(4).optional(),
     })
-    .refine((data) => Object.values(data).some((value) => value !== undefined), {
-        message: "At least one field is required to update",
-    });
+    .refine(
+        (data) => Object.values(data).some((value) => value !== undefined),
+        {
+            message: "At least one field is required to update",
+        }
+    );
 
 export const forgotPasswordSchema = z.object({
     email: z.string().email("Invalid email address"),
@@ -50,12 +54,27 @@ export const changePasswordSchema = z.object({
     newPassword: z.string().min(6, "New password must be at least 6 characters"),
 });
 
+export const authUserQuerySchema = paginationSchema.extend({
+    role: z.enum(["CUSTOMER", "TECHNICIAN", "ADMIN"]).optional(),
+    isActive: z.coerce.boolean().optional(),
+    search: z.string().optional(),
+});
+
+export const updateUserRoleSchema = z.object({
+    role: z.enum(["CUSTOMER", "TECHNICIAN", "ADMIN"], {
+        message: "Role must be CUSTOMER, TECHNICIAN, or ADMIN",
+    }),
+    trade: z.string().min(2).optional(),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type UpdateMeInput = z.infer<typeof updateMeSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type AuthUserQuery = z.infer<typeof authUserQuerySchema>;
+export type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>;
 
 export type JwtPayload = {
     userId: string;
