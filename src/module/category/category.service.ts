@@ -79,17 +79,6 @@ export const getCategoryById = async (
     return mapCategory(category);
 };
 
-export const getAllAreas = async () => {
-    return prisma.area.findMany({
-        select: {
-            id: true,
-            name: true,
-            _count: { select: { technicians: true } },
-        },
-        orderBy: { name: "asc" },
-    });
-};
-
 export const createCategory = async (payload: CreateCategoryInput) => {
     const existingCategory = await prisma.category.findFirst({
         where: {

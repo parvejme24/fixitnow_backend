@@ -9,10 +9,8 @@ import { catchAsync } from "./utils/catchAsync.js";
 import { adminRoutes } from "./module/admin/admin.routes.js";
 import { authRoutes } from "./module/auth/auth.routes.js";
 import { bookingRoutes } from "./module/booking/booking.routes.js";
-import {
-    areaRoutes,
-    categoryRoutes,
-} from "./module/category/category.routes.js";
+import { areaRoutes } from "./module/area/area.routes.js";
+import { categoryRoutes } from "./module/category/category.routes.js";
 import { paymentRoutes } from "./module/payment/payment.routes.js";
 import { reviewRoutes } from "./module/review/review.routes.js";
 import { serviceRoutes } from "./module/service/service.routes.js";

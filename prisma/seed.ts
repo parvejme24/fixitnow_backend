@@ -285,7 +285,7 @@ type TechSeed = {
   phone: string;
   initials: string;
   trade: string;
-  areaName: (typeof AREA_NAMES)[number];
+  areaNames: (typeof AREA_NAMES)[number][];
   visitFee: number;
   experienceYrs: number;
   jobsCompleted: number;
@@ -304,7 +304,7 @@ const TECHNICIANS: TechSeed[] = [
     phone: "01711000001",
     initials: "RA",
     trade: "Plumbing",
-    areaName: "Dhanmondi",
+    areaNames: ["Dhanmondi", "Mohammadpur"],
     visitFee: 200,
     experienceYrs: 8,
     jobsCompleted: 420,
@@ -321,7 +321,7 @@ const TECHNICIANS: TechSeed[] = [
     phone: "01711000002",
     initials: "SH",
     trade: "Electrical",
-    areaName: "Mirpur",
+    areaNames: ["Mirpur", "Uttara"],
     visitFee: 150,
     experienceYrs: 6,
     jobsCompleted: 310,
@@ -338,7 +338,7 @@ const TECHNICIANS: TechSeed[] = [
     phone: "01711000003",
     initials: "NA",
     trade: "Cleaning",
-    areaName: "Mohammadpur",
+    areaNames: ["Mohammadpur"],
     visitFee: 100,
     experienceYrs: 5,
     jobsCompleted: 280,
@@ -355,7 +355,7 @@ const TECHNICIANS: TechSeed[] = [
     phone: "01711000004",
     initials: "JU",
     trade: "AC & Cooling",
-    areaName: "Gulshan",
+    areaNames: ["Gulshan", "Banani", "Bashundhara"],
     visitFee: 300,
     experienceYrs: 10,
     jobsCompleted: 560,
@@ -372,7 +372,7 @@ const TECHNICIANS: TechSeed[] = [
     phone: "01711000005",
     initials: "MI",
     trade: "Painting",
-    areaName: "Uttara",
+    areaNames: ["Uttara"],
     visitFee: 250,
     experienceYrs: 7,
     jobsCompleted: 190,
@@ -389,7 +389,7 @@ const TECHNICIANS: TechSeed[] = [
     phone: "01711000006",
     initials: "FA",
     trade: "Pest Control",
-    areaName: "Bashundhara",
+    areaNames: ["Bashundhara"],
     visitFee: 200,
     experienceYrs: 4,
     jobsCompleted: 150,
@@ -406,7 +406,7 @@ const TECHNICIANS: TechSeed[] = [
     phone: "01711000007",
     initials: "TA",
     trade: "Carpentry",
-    areaName: "Banani",
+    areaNames: ["Banani"],
     visitFee: 180,
     experienceYrs: 9,
     jobsCompleted: 340,
@@ -423,7 +423,7 @@ const TECHNICIANS: TechSeed[] = [
     phone: "01711000008",
     initials: "IM",
     trade: "Appliance Repair",
-    areaName: "Mirpur",
+    areaNames: ["Mirpur"],
     visitFee: 220,
     experienceYrs: 6,
     jobsCompleted: 260,
@@ -440,7 +440,7 @@ const TECHNICIANS: TechSeed[] = [
     phone: "01711000009",
     initials: "SO",
     trade: "Plumbing",
-    areaName: "Old Dhaka",
+    areaNames: ["Old Dhaka"],
     visitFee: 400,
     experienceYrs: 12,
     jobsCompleted: 610,
@@ -553,8 +553,11 @@ async function main() {
 
   // ── 5. Technicians (users + profiles) ─────────────────────
   for (const tech of TECHNICIANS) {
-    const areaId = areaByName.get(tech.areaName);
-    if (!areaId) throw new Error(`Missing area: ${tech.areaName}`);
+    const areaIds = tech.areaNames.map((name) => {
+      const areaId = areaByName.get(name);
+      if (!areaId) throw new Error(`Missing area: ${name}`);
+      return areaId;
+    });
 
     const user = await prisma.user.upsert({
       where: { email: tech.email },
@@ -580,7 +583,6 @@ async function main() {
     const profileData = {
       userId: user.id,
       trade: tech.trade,
-      areaId,
       bio: tech.bio,
       initials: tech.initials,
       visitFee: tech.visitFee,
@@ -603,6 +605,19 @@ async function main() {
       : await prisma.technicianProfile.create({
           data: profileData,
         });
+
+    // Service zones
+    await prisma.technicianArea.deleteMany({
+      where: { technicianId: profile.id },
+    });
+    for (const areaId of areaIds) {
+      await prisma.technicianArea.create({
+        data: {
+          technicianId: profile.id,
+          areaId,
+        },
+      });
+    }
 
     // Categories
     for (const categorySlug of tech.categorySlugs) {

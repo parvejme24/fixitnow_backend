@@ -10,6 +10,7 @@ import {
     getTechnicianSlots,
     getTechnicians,
     getTopTechnicians,
+    updateAreas,
     updateAvailability,
     updateCategories,
     updateProfile,
@@ -24,6 +25,7 @@ router.get("/top", getTopTechnicians);
 
 router.patch("/me", authenticate, requireTechnician, updateProfile);
 router.put("/me/categories", authenticate, requireTechnician, updateCategories);
+router.put("/me/areas", authenticate, requireTechnician, updateAreas);
 router.put("/me/skills", authenticate, requireTechnician, updateSkills);
 router.post("/me/slots", authenticate, requireTechnician, createAvailability);
 router.patch(

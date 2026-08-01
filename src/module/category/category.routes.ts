@@ -5,7 +5,6 @@ import {
     createCategory,
     deleteCategory,
     getAdminCategories,
-    getAreas,
     getCategories,
     getCategory,
     getCategoryStats,
@@ -41,10 +40,3 @@ router.patch(
 router.delete("/:id", authenticate, requireAdmin, deleteCategory); // delete category
 
 export const categoryRoutes = router;
-
-// ─────────────────────────────────────────────
-// Public: Dhaka areas
-// ─────────────────────────────────────────────
-const areaRouter = Router();
-areaRouter.get("/", getAreas);
-export const areaRoutes = areaRouter;

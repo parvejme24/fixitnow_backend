@@ -4,6 +4,7 @@ import {
     createAvailabilitySlotSchema,
     slotsQuerySchema,
     technicianQuerySchema,
+    updateAreasSchema,
     updateAvailabilitySlotSchema,
     updateCategoriesSchema,
     updateProfileSchema,
@@ -91,6 +92,19 @@ export const updateSkills = catchAsync(async (req: Request, res: Response) => {
 export const updateCategories = catchAsync(async (req: Request, res: Response) => {
     const payload = updateCategoriesSchema.parse(req.body);
     const profile = await technicianService.updateTechnicianCategories(
+        req.user!.userId,
+        payload
+    );
+
+    res.status(200).json({
+        success: true,
+        data: profile,
+    });
+});
+
+export const updateAreas = catchAsync(async (req: Request, res: Response) => {
+    const payload = updateAreasSchema.parse(req.body);
+    const profile = await technicianService.updateTechnicianAreas(
         req.user!.userId,
         payload
     );

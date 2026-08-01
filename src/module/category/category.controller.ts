@@ -29,15 +29,6 @@ export const getCategory = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-export const getAreas = catchAsync(async (req: Request, res: Response) => {
-    const areas = await categoryService.getAllAreas();
-
-    res.status(200).json({
-        success: true,
-        data: areas,
-    });
-});
-
 // ── Admin ───────────────────────────────────────────────────
 
 export const getAdminCategories = catchAsync(

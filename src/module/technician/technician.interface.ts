@@ -24,7 +24,6 @@ export const updateProfileSchema = z
     .object({
         trade: z.string().min(2, "Trade must be at least 2 characters").optional(),
         bio: z.string().optional(),
-        areaId: z.string().optional(),
         visitFee: z.coerce.number().min(0).optional(),
         experienceYrs: z.coerce.number().int().min(0).optional(),
         coverKm: z.coerce.number().int().min(0).optional(),
@@ -42,6 +41,11 @@ export const updateSkillsSchema = z.object({
 
 export const updateCategoriesSchema = z.object({
     categoryIds: z.array(z.string().min(1)),
+});
+
+/** Replace technician service zones (must be admin-created areas) */
+export const updateAreasSchema = z.object({
+    areaIds: z.array(z.string().min(1)).min(1, "Select at least one area"),
 });
 
 export const createAvailabilitySlotSchema = z.object({
@@ -70,6 +74,7 @@ export type SlotsQuery = z.infer<typeof slotsQuerySchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type UpdateSkillsInput = z.infer<typeof updateSkillsSchema>;
 export type UpdateCategoriesInput = z.infer<typeof updateCategoriesSchema>;
+export type UpdateAreasInput = z.infer<typeof updateAreasSchema>;
 export type CreateAvailabilitySlotInput = z.infer<typeof createAvailabilitySlotSchema>;
 export type UpdateAvailabilitySlotInput = z.infer<typeof updateAvailabilitySlotSchema>;
 export type VerifyTechnicianInput = z.infer<typeof verifyTechnicianSchema>;

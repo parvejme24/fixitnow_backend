@@ -6,9 +6,11 @@ import { Role } from "../../../generated/prisma/enums.js";
 import config from "../../config/index.js";
 import { uploadProfileImage } from "../../lib/cloudinary.js";
 import {
+    sendLoginNotifyEmail,
     sendPasswordChangedEmail,
     sendPasswordResetEmail,
     sendRoleChangedEmail,
+    sendWelcomeEmail,
 } from "../../lib/email.js";
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../utils/AppError.js";
@@ -41,7 +43,6 @@ const technicianProfileSelect = {
     id: true,
     trade: true,
     bio: true,
-    areaId: true,
     visitFee: true,
     experienceYrs: true,
     jobsCompleted: true,
@@ -49,6 +50,13 @@ const technicianProfileSelect = {
     reviewCount: true,
     online: true,
     verified: true,
+    areas: {
+        select: {
+            area: {
+                select: { id: true, name: true },
+            },
+        },
+    },
 };
 
 const getInitials = (name: string) => {
@@ -123,6 +131,13 @@ export const registerUser = async (payload: RegisterInput) => {
         role: user.role,
     });
 
+    // Notify user by email (do not fail registration if SMTP fails)
+    try {
+        await sendWelcomeEmail(user.email, user.name, user.role);
+    } catch (error) {
+        console.error("Welcome email failed:", error);
+    }
+
     return { user, token };
 };
 
@@ -160,7 +175,37 @@ export const loginUser = async (payload: LoginInput) => {
         role: user.role,
     });
 
+    // Login security notify (do not fail login if SMTP fails)
+    try {
+        await sendLoginNotifyEmail(user.email, user.name);
+    } catch (error) {
+        console.error("Login notify email failed:", error);
+    }
+
     return { user: userWithoutPassword, token };
+};
+
+const mapUserWithProfile = <
+    T extends {
+        technicianProfile: {
+            areas: { area: { id: string; name: string } }[];
+        } | null;
+    },
+>(
+    user: T
+) => {
+    if (!user.technicianProfile) {
+        return user;
+    }
+
+    const { areas, ...profile } = user.technicianProfile;
+    return {
+        ...user,
+        technicianProfile: {
+            ...profile,
+            areas: areas.map((item) => item.area),
+        },
+    };
 };
 
 export const getCurrentUser = async (userId: string) => {
@@ -180,7 +225,7 @@ export const getCurrentUser = async (userId: string) => {
         throw new AppError("Your account has been banned", 403);
     }
 
-    return user;
+    return mapUserWithProfile(user);
 };
 
 export const updateMe = async (
@@ -217,7 +262,7 @@ export const updateMe = async (
         throw new AppError("At least one field or profile image is required", 400);
     }
 
-    return prisma.user.update({
+    const user = await prisma.user.update({
         where: { id: userId },
         data,
         select: {
@@ -225,6 +270,8 @@ export const updateMe = async (
             technicianProfile: { select: technicianProfileSelect },
         },
     });
+
+    return mapUserWithProfile(user);
 };
 
 export const forgotPassword = async (payload: ForgotPasswordInput) => {

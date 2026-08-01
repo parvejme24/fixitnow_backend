@@ -8,7 +8,13 @@ export const globalErrorHandler = (
     res: Response,
     next: NextFunction
 ) => {
-    console.error(err);
+    console.error("[API Error]", {
+        name: err.name,
+        message: err.message,
+        stack: err.stack,
+        path: req.originalUrl,
+        method: req.method,
+    });
 
     if (err instanceof ZodError) {
         return res.status(400).json({
@@ -26,6 +32,22 @@ export const globalErrorHandler = (
             error: {
                 code: err.code,
                 message: err.message,
+            },
+        });
+    }
+
+    if (
+        err.message?.includes("Unknown argument") ||
+        err.message?.includes("column") ||
+        err.name === "PrismaClientValidationError"
+    ) {
+        return res.status(500).json({
+            success: false,
+            error: {
+                code: "DATABASE_SCHEMA_MISMATCH",
+                message:
+                    err.message ||
+                    "Database schema is out of date. Run prisma db push on production DATABASE_URL.",
             },
         });
     }

@@ -35,6 +35,57 @@ export const sendEmail = async ({ to, subject, html, text }: SendMailOptions) =>
     return { skipped: false as const, messageId: info.messageId };
 };
 
+export const sendWelcomeEmail = async (
+    to: string,
+    name: string,
+    role: string
+) => {
+    return sendEmail({
+        to,
+        subject: "Welcome to FixItNow",
+        html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111">
+        <h2>Welcome, ${name}!</h2>
+        <p>Your FixItNow account has been created successfully.</p>
+        <p><strong>Role:</strong> ${role}</p>
+        <p>You can now browse services, book technicians, and manage your profile.</p>
+        <p><a href="${config.app_url}" style="background:#0f766e;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">
+          Open FixItNow
+        </a></p>
+        <p>— FixItNow</p>
+      </div>
+    `,
+    });
+};
+
+export const sendLoginNotifyEmail = async (
+    to: string,
+    name: string,
+    at: Date = new Date()
+) => {
+    const when = at.toLocaleString("en-BD", {
+        timeZone: "Asia/Dhaka",
+        dateStyle: "medium",
+        timeStyle: "short",
+    });
+
+    return sendEmail({
+        to,
+        subject: "New login to your FixItNow account",
+        html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111">
+        <h2>Login notification</h2>
+        <p>Hi ${name},</p>
+        <p>Someone just signed in to your FixItNow account.</p>
+        <p><strong>Time:</strong> ${when} (Asia/Dhaka)</p>
+        <p>If this was you, you can ignore this email. If not, change your password immediately.</p>
+        <p><a href="${config.app_url}/forgot-password">Reset password</a></p>
+        <p>— FixItNow</p>
+      </div>
+    `,
+    });
+};
+
 export const sendPasswordResetEmail = async (
     to: string,
     name: string,

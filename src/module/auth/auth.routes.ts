@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authenticate } from "../../middleware/auth.js";
 import { requireAdmin } from "../../middleware/admin.js";
-import { uploadProfileImageMiddleware } from "../../middleware/upload.js";
+import { uploadProfileImageMiddleware } from "../../middleware/imageUpload.js";
 import {
     changePassword,
     forgotPassword,

@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { catchAsync } from "../../utils/catchAsync.js";
+import { AppError } from "../../utils/AppError.js";
 import {
     createServiceSchema,
     serviceQuerySchema,
@@ -43,8 +44,8 @@ export const getServiceDetails = catchAsync(
 );
 
 export const createService = catchAsync(async (req: Request, res: Response) => {
-    const payload = createServiceSchema.parse(req.body);
-    const service = await serviceService.createService(payload);
+    const payload = createServiceSchema.parse(req.body ?? {});
+    const service = await serviceService.createService(payload, req.file);
 
     res.status(201).json({
         success: true,
@@ -53,10 +54,23 @@ export const createService = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const updateService = catchAsync(async (req: Request, res: Response) => {
-    const payload = updateServiceSchema.parse(req.body);
+    const body = req.body ?? {};
+    const hasTextFields = Object.keys(body).some(
+        (key) => body[key] !== undefined && body[key] !== ""
+    );
+
+    let payload: ReturnType<typeof updateServiceSchema.parse> = {};
+
+    if (hasTextFields) {
+        payload = updateServiceSchema.parse(body);
+    } else if (!req.file) {
+        throw new AppError("Provide service fields and/or an image file", 400);
+    }
+
     const service = await serviceService.updateService(
         req.params.id as string,
-        payload
+        payload,
+        req.file
     );
 
     res.status(200).json({

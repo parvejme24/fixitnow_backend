@@ -5,6 +5,7 @@ import {
     CreateAvailabilitySlotInput,
     SlotsQuery,
     TechnicianQuery,
+    UpdateAreasInput,
     UpdateAvailabilitySlotInput,
     UpdateCategoriesInput,
     UpdateProfileInput,
@@ -26,8 +27,12 @@ const technicianListSelect = {
     verified: true,
     coverKm: true,
     replyMins: true,
-    area: {
-        select: { id: true, name: true },
+    areas: {
+        select: {
+            area: {
+                select: { id: true, name: true },
+            },
+        },
     },
     user: {
         select: {
@@ -61,6 +66,42 @@ const profileSelect = {
         },
     },
 } satisfies Prisma.TechnicianProfileSelect;
+
+const mapTechnician = <
+    T extends {
+        areas: { area: { id: string; name: string } }[];
+        categories: { category: { id: string; name: string; slug: string } }[];
+    },
+>(
+    technician: T
+) => {
+    const { areas, categories, ...rest } = technician;
+    return {
+        ...rest,
+        areas: areas.map((item) => item.area),
+        categories: categories.map((item) => item.category),
+    };
+};
+
+const buildAreaFilter = (
+    areaFilter: string
+): Prisma.TechnicianProfileWhereInput => ({
+    areas: {
+        some: {
+            OR: [
+                { areaId: areaFilter },
+                {
+                    area: {
+                        name: {
+                            equals: areaFilter,
+                            mode: "insensitive",
+                        },
+                    },
+                },
+            ],
+        },
+    },
+});
 
 const getInitials = (name: string) => {
     return name
@@ -135,23 +176,7 @@ export const getAllTechnicians = async (query: TechnicianQuery) => {
     const where: Prisma.TechnicianProfileWhereInput = {
         user: { isActive: true },
         AND: [
-            ...(areaFilter
-                ? [
-                      {
-                          OR: [
-                              { areaId: areaFilter },
-                              {
-                                  area: {
-                                      name: {
-                                          equals: areaFilter,
-                                          mode: "insensitive" as const,
-                                      },
-                                  },
-                              },
-                          ],
-                      },
-                  ]
-                : []),
+            ...(areaFilter ? [buildAreaFilter(areaFilter)] : []),
             ...(search
                 ? [
                       {
@@ -209,7 +234,7 @@ export const getAllTechnicians = async (query: TechnicianQuery) => {
     ]);
 
     return {
-        technicians,
+        technicians: technicians.map(mapTechnician),
         meta: {
             page,
             limit,
@@ -220,12 +245,14 @@ export const getAllTechnicians = async (query: TechnicianQuery) => {
 };
 
 export const getTopTechnicians = async () => {
-    return prisma.technicianProfile.findMany({
+    const technicians = await prisma.technicianProfile.findMany({
         where: { user: { isActive: true }, verified: true },
         select: technicianListSelect,
         take: 3,
         orderBy: [{ ratingAvg: "desc" }, { jobsCompleted: "desc" }],
     });
+
+    return technicians.map(mapTechnician);
 };
 
 export const getTechnicianById = async (id: string) => {
@@ -278,12 +305,16 @@ export const getTechnicianById = async (id: string) => {
     );
 
     return {
-        ...technician,
-        categories: technician.categories.map((item) => ({
-            id: item.category.id,
-            name: item.category.name,
-            slug: item.category.slug,
-        })),
+        ...mapTechnician({
+            ...technician,
+            categories: technician.categories.map((item) => ({
+                category: {
+                    id: item.category.id,
+                    name: item.category.name,
+                    slug: item.category.slug,
+                },
+            })),
+        }),
         offeredServices,
     };
 };
@@ -325,11 +356,13 @@ export const updateTechnicianProfile = async (
 ) => {
     const profile = await getTechnicianProfileByUserId(userId);
 
-    return prisma.technicianProfile.update({
+    const updated = await prisma.technicianProfile.update({
         where: { id: profile.id },
         data: payload,
         select: profileSelect,
     });
+
+    return mapTechnician(updated);
 };
 
 export const updateTechnicianSkills = async (
@@ -341,7 +374,7 @@ export const updateTechnicianSkills = async (
         ...new Set(payload.skills.map((skill) => skill.trim()).filter(Boolean)),
     ];
 
-    return prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx) => {
         await tx.technicianSkill.deleteMany({
             where: { technicianId: profile.id },
         });
@@ -360,6 +393,8 @@ export const updateTechnicianSkills = async (
             select: profileSelect,
         });
     });
+
+    return mapTechnician(updated);
 };
 
 export const updateTechnicianCategories = async (
@@ -379,7 +414,7 @@ export const updateTechnicianCategories = async (
         }
     }
 
-    return prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx) => {
         await tx.technicianCategory.deleteMany({
             where: { technicianId: profile.id },
         });
@@ -398,6 +433,47 @@ export const updateTechnicianCategories = async (
             select: profileSelect,
         });
     });
+
+    return mapTechnician(updated);
+};
+
+export const updateTechnicianAreas = async (
+    userId: string,
+    payload: UpdateAreasInput
+) => {
+    const profile = await getTechnicianProfileByUserId(userId);
+    const uniqueAreaIds = [...new Set(payload.areaIds)];
+
+    const count = await prisma.area.count({
+        where: { id: { in: uniqueAreaIds } },
+    });
+
+    if (count !== uniqueAreaIds.length) {
+        throw new AppError(
+            "One or more areas were not found. Choose from admin service zones.",
+            404
+        );
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+        await tx.technicianArea.deleteMany({
+            where: { technicianId: profile.id },
+        });
+
+        await tx.technicianArea.createMany({
+            data: uniqueAreaIds.map((areaId) => ({
+                technicianId: profile.id,
+                areaId,
+            })),
+        });
+
+        return tx.technicianProfile.findUniqueOrThrow({
+            where: { id: profile.id },
+            select: profileSelect,
+        });
+    });
+
+    return mapTechnician(updated);
 };
 
 export const createTechnicianAvailabilitySlot = async (
@@ -495,9 +571,11 @@ export const verifyTechnician = async (
         throw new AppError("Technician not found", 404);
     }
 
-    return prisma.technicianProfile.update({
+    const updated = await prisma.technicianProfile.update({
         where: { id: technicianId },
         data: { verified: payload.verified },
         select: profileSelect,
     });
+
+    return mapTechnician(updated);
 };

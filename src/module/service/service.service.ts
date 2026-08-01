@@ -1,4 +1,5 @@
 import { Prisma } from "../../../generated/prisma/client.js";
+import { uploadServiceImage } from "../../lib/cloudinary.js";
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../utils/AppError.js";
 import {
@@ -12,6 +13,7 @@ const serviceSelect = {
     categoryId: true,
     title: true,
     description: true,
+    image: true,
     price: true,
     duration: true,
     ratingAvg: true,
@@ -26,6 +28,7 @@ const serviceSelect = {
             id: true,
             name: true,
             slug: true,
+            icon: true,
         },
     },
 } satisfies Prisma.ServiceSelect;
@@ -33,6 +36,7 @@ const serviceSelect = {
 const buildServiceWhere = (query: ServiceQuery): Prisma.ServiceWhereInput => {
     const search = query.q || query.search;
     const categoryId = query.cat || query.categoryId;
+    const areaFilter = query.area || query.areaId;
 
     return {
         isActive: true,
@@ -53,6 +57,33 @@ const buildServiceWhere = (query: ServiceQuery): Prisma.ServiceWhereInput => {
                 { title: { contains: search, mode: "insensitive" } },
                 { description: { contains: search, mode: "insensitive" } },
             ],
+        }),
+        // Services offered by at least one technician covering this area
+        ...(areaFilter && {
+            category: {
+                technicianCategories: {
+                    some: {
+                        technician: {
+                            user: { isActive: true },
+                            areas: {
+                                some: {
+                                    OR: [
+                                        { areaId: areaFilter },
+                                        {
+                                            area: {
+                                                name: {
+                                                    equals: areaFilter,
+                                                    mode: "insensitive",
+                                                },
+                                            },
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                },
+            },
         }),
     };
 };
@@ -123,7 +154,10 @@ export const getServiceById = async (id: string) => {
     return service;
 };
 
-export const createService = async (payload: CreateServiceInput) => {
+export const createService = async (
+    payload: CreateServiceInput,
+    file?: Express.Multer.File
+) => {
     const category = await prisma.category.findUnique({
         where: { id: payload.categoryId },
     });
@@ -132,16 +166,33 @@ export const createService = async (payload: CreateServiceInput) => {
         throw new AppError("Category not found", 404);
     }
 
+    let image: string | undefined;
+    if (file) {
+        const uploaded = await uploadServiceImage(file.buffer);
+        image = uploaded.url;
+    }
+
     return prisma.service.create({
         data: {
-            ...payload,
+            categoryId: payload.categoryId,
+            title: payload.title,
+            description: payload.description,
+            price: payload.price,
+            duration: payload.duration,
             tag: payload.tag ?? undefined,
+            isFeatured: payload.isFeatured,
+            sortOrder: payload.sortOrder,
+            image,
         },
         select: serviceSelect,
     });
 };
 
-export const updateService = async (id: string, payload: UpdateServiceInput) => {
+export const updateService = async (
+    id: string,
+    payload: UpdateServiceInput,
+    file?: Express.Multer.File
+) => {
     const service = await prisma.service.findUnique({ where: { id } });
 
     if (!service) {
@@ -157,12 +208,34 @@ export const updateService = async (id: string, payload: UpdateServiceInput) => 
         }
     }
 
+    const data: Prisma.ServiceUpdateInput = {
+        ...(payload.categoryId !== undefined && {
+            category: { connect: { id: payload.categoryId } },
+        }),
+        ...(payload.title !== undefined && { title: payload.title }),
+        ...(payload.description !== undefined && {
+            description: payload.description,
+        }),
+        ...(payload.price !== undefined && { price: payload.price }),
+        ...(payload.duration !== undefined && { duration: payload.duration }),
+        ...(payload.tag !== undefined && { tag: payload.tag }),
+        ...(payload.isFeatured !== undefined && { isFeatured: payload.isFeatured }),
+        ...(payload.isActive !== undefined && { isActive: payload.isActive }),
+        ...(payload.sortOrder !== undefined && { sortOrder: payload.sortOrder }),
+    };
+
+    if (file) {
+        const uploaded = await uploadServiceImage(file.buffer);
+        data.image = uploaded.url;
+    }
+
+    if (Object.keys(data).length === 0) {
+        throw new AppError("Provide service fields and/or an image file", 400);
+    }
+
     return prisma.service.update({
         where: { id },
-        data: {
-            ...payload,
-            tag: payload.tag === null ? null : payload.tag,
-        },
+        data,
         select: serviceSelect,
     });
 };
