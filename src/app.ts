@@ -76,6 +76,9 @@ apiV1.use("/technicians", technicianRoutes);
 
 app.use("/api/v1", apiV1);
 
+// ShurjoPay may return to /api/payments/... (without v1) if that was the return_url
+app.use("/api/payments", paymentRoutes);
+
 app.use(notFound);
 app.use(globalErrorHandler);
 

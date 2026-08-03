@@ -10,14 +10,49 @@ export const registerSchema = z
         role: z.enum(["CUSTOMER", "TECHNICIAN", "ADMIN"], {
             message: "Role must be CUSTOMER, TECHNICIAN, or ADMIN",
         }),
-        trade: z.string().min(2, "Trade must be at least 2 characters").optional(),
+        /** Primary trade — required for TECHNICIAN */
+        trade: z.string().min(2, "Primary trade is required").optional(),
+        /** Years of experience — required for TECHNICIAN (0 allowed) */
+        experienceYrs: z.coerce.number().int().min(0).optional(),
+        /** Service area id from GET /areas (single select) */
+        areaId: z.string().min(1).optional(),
+        /** Or area name e.g. "Dhanmondi" */
+        area: z.string().min(1).optional(),
+        /** Or multiple area ids */
+        areaIds: z.array(z.string().min(1)).optional(),
     })
     .superRefine((data, ctx) => {
-        if (data.role === "TECHNICIAN" && !data.trade) {
+        if (data.role !== "TECHNICIAN") {
+            return;
+        }
+
+        if (!data.trade?.trim()) {
             ctx.addIssue({
                 code: "custom",
                 path: ["trade"],
-                message: "Trade is required when registering as a technician",
+                message: "Primary trade is required when registering as a technician",
+            });
+        }
+
+        if (data.experienceYrs === undefined) {
+            ctx.addIssue({
+                code: "custom",
+                path: ["experienceYrs"],
+                message: "Years of experience is required when registering as a technician",
+            });
+        }
+
+        const hasArea =
+            Boolean(data.areaId) ||
+            Boolean(data.area?.trim()) ||
+            (data.areaIds !== undefined && data.areaIds.length > 0);
+
+        if (!hasArea) {
+            ctx.addIssue({
+                code: "custom",
+                path: ["areaId"],
+                message:
+                    "Service area is required when registering as a technician",
             });
         }
     });
@@ -57,6 +92,7 @@ export const changePasswordSchema = z.object({
 export const authUserQuerySchema = paginationSchema.extend({
     role: z.enum(["CUSTOMER", "TECHNICIAN", "ADMIN"]).optional(),
     isActive: z.coerce.boolean().optional(),
+    verified: z.coerce.boolean().optional(),
     search: z.string().optional(),
 });
 

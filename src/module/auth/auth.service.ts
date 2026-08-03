@@ -95,6 +95,54 @@ export const registerUser = async (payload: RegisterInput) => {
         }
     }
 
+    let resolvedAreaIds: string[] = [];
+
+    if (payload.role === "TECHNICIAN") {
+        const requestedIds = [
+            ...new Set(
+                [
+                    ...(payload.areaIds ?? []),
+                    ...(payload.areaId ? [payload.areaId] : []),
+                ].filter(Boolean)
+            ),
+        ];
+
+        if (requestedIds.length > 0) {
+            const areas = await prisma.area.findMany({
+                where: { id: { in: requestedIds } },
+                select: { id: true },
+            });
+
+            if (areas.length !== requestedIds.length) {
+                throw new AppError(
+                    "One or more service areas were not found. Choose from available zones.",
+                    404
+                );
+            }
+
+            resolvedAreaIds = requestedIds;
+        } else if (payload.area?.trim()) {
+            const area = await prisma.area.findFirst({
+                where: {
+                    name: {
+                        equals: payload.area.trim(),
+                        mode: "insensitive",
+                    },
+                },
+                select: { id: true },
+            });
+
+            if (!area) {
+                throw new AppError(
+                    `Service area "${payload.area}" was not found. Choose from available zones.`,
+                    404
+                );
+            }
+
+            resolvedAreaIds = [area.id];
+        }
+    }
+
     const passwordHash = await bcrypt.hash(payload.password, 12);
     const initials = getInitials(payload.name);
 
@@ -112,17 +160,35 @@ export const registerUser = async (payload: RegisterInput) => {
         });
 
         if (payload.role === "TECHNICIAN") {
-            await tx.technicianProfile.create({
+            const profile = await tx.technicianProfile.create({
                 data: {
                     userId: createdUser.id,
-                    trade: payload.trade || "General",
+                    trade: payload.trade!.trim(),
+                    experienceYrs: payload.experienceYrs ?? 0,
                     initials,
                     visitFee: 0,
                 },
             });
+
+            if (resolvedAreaIds.length > 0) {
+                await tx.technicianArea.createMany({
+                    data: resolvedAreaIds.map((areaId) => ({
+                        technicianId: profile.id,
+                        areaId,
+                    })),
+                });
+            }
         }
 
         return createdUser;
+    });
+
+    const userWithProfile = await prisma.user.findUniqueOrThrow({
+        where: { id: user.id },
+        select: {
+            ...userSelect,
+            technicianProfile: { select: technicianProfileSelect },
+        },
     });
 
     const token = signToken({
@@ -138,7 +204,7 @@ export const registerUser = async (payload: RegisterInput) => {
         console.error("Welcome email failed:", error);
     }
 
-    return { user, token };
+    return { user: mapUserWithProfile(userWithProfile), token };
 };
 
 export const loginUser = async (payload: LoginInput) => {
@@ -387,12 +453,15 @@ export const changePassword = async (
 };
 
 export const getAllUsers = async (query: AuthUserQuery) => {
-    const { page, limit, role, isActive, search } = query;
+    const { page, limit, role, isActive, verified, search } = query;
     const skip = (page - 1) * limit;
 
     const where: Prisma.UserWhereInput = {
         ...(role && { role }),
         ...(isActive !== undefined && { isActive }),
+        ...(verified !== undefined && {
+            technicianProfile: { verified },
+        }),
         ...(search && {
             OR: [
                 { name: { contains: search, mode: "insensitive" } },
@@ -411,8 +480,16 @@ export const getAllUsers = async (query: AuthUserQuery) => {
                     select: {
                         id: true,
                         trade: true,
+                        experienceYrs: true,
                         ratingAvg: true,
                         verified: true,
+                        areas: {
+                            select: {
+                                area: {
+                                    select: { id: true, name: true },
+                                },
+                            },
+                        },
                     },
                 },
             },
@@ -424,7 +501,7 @@ export const getAllUsers = async (query: AuthUserQuery) => {
     ]);
 
     return {
-        users,
+        users: users.map(mapUserWithProfile),
         meta: {
             page,
             limit,

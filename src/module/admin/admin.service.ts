@@ -3,6 +3,7 @@ import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../utils/AppError.js";
 import {
     AdminBookingQuery,
+    AdminSalesQuery,
     AdminUserQuery,
     UpdateUserStatusInput,
 } from "./admin.interface.js";
@@ -22,7 +23,18 @@ const userSelect = {
         select: {
             id: true,
             trade: true,
+            experienceYrs: true,
             ratingAvg: true,
+            reviewCount: true,
+            verified: true,
+            online: true,
+            areas: {
+                select: {
+                    area: {
+                        select: { id: true, name: true },
+                    },
+                },
+            },
         },
     },
     _count: {
@@ -31,6 +43,29 @@ const userSelect = {
             reviews: true,
         },
     },
+};
+
+const mapAdminUser = <
+    T extends {
+        technicianProfile: {
+            areas: { area: { id: string; name: string } }[];
+        } | null;
+    },
+>(
+    user: T
+) => {
+    if (!user.technicianProfile) {
+        return user;
+    }
+
+    const { areas, ...profile } = user.technicianProfile;
+    return {
+        ...user,
+        technicianProfile: {
+            ...profile,
+            areas: areas.map((item) => item.area),
+        },
+    };
 };
 
 const adminBookingSelect = {
@@ -89,12 +124,15 @@ const adminBookingSelect = {
 };
 
 export const getAllUsers = async (query: AdminUserQuery) => {
-    const { page, limit, role, isActive, search } = query;
+    const { page, limit, role, isActive, verified, search } = query;
     const skip = (page - 1) * limit;
 
     const where: Prisma.UserWhereInput = {
         ...(role && { role }),
         ...(isActive !== undefined && { isActive }),
+        ...(verified !== undefined && {
+            technicianProfile: { verified },
+        }),
         ...(search && {
             OR: [
                 { name: { contains: search, mode: "insensitive" } },
@@ -115,7 +153,7 @@ export const getAllUsers = async (query: AdminUserQuery) => {
     ]);
 
     return {
-        users,
+        users: users.map(mapAdminUser),
         meta: {
             page,
             limit,
@@ -131,6 +169,7 @@ export const updateUserStatus = async (
 ) => {
     const user = await prisma.user.findUnique({
         where: { id: userId },
+        include: { technicianProfile: true },
     });
 
     if (!user) {
@@ -141,11 +180,33 @@ export const updateUserStatus = async (
         throw new AppError("Cannot change status of an admin user", 400);
     }
 
-    return prisma.user.update({
+    if (payload.verified !== undefined) {
+        if (user.role !== "TECHNICIAN" || !user.technicianProfile) {
+            throw new AppError(
+                "Only technician accounts can be verified or unverified",
+                400
+            );
+        }
+
+        await prisma.technicianProfile.update({
+            where: { id: user.technicianProfile.id },
+            data: { verified: payload.verified },
+        });
+    }
+
+    if (payload.isActive !== undefined) {
+        await prisma.user.update({
+            where: { id: userId },
+            data: { isActive: payload.isActive },
+        });
+    }
+
+    const updated = await prisma.user.findUniqueOrThrow({
         where: { id: userId },
-        data: { isActive: payload.isActive },
         select: userSelect,
     });
+
+    return mapAdminUser(updated);
 };
 
 export const getAllBookings = async (query: AdminBookingQuery) => {
@@ -179,6 +240,13 @@ export const getAllBookings = async (query: AdminBookingQuery) => {
 };
 
 export const getAdminStats = async () => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    const ADMIN_REVENUE_RATE = 0.4;
+
     const [
         totalUsers,
         totalCustomers,
@@ -187,7 +255,8 @@ export const getAdminStats = async () => {
         completedBookings,
         cancelledBookings,
         declinedBookings,
-        revenueAgg,
+        totalSalesAgg,
+        todaySalesAgg,
         pendingRefunds,
         unverifiedTechnicians,
     ] = await Promise.all([
@@ -203,6 +272,14 @@ export const getAdminStats = async () => {
             _sum: { amount: true },
             _count: { id: true },
         }),
+        prisma.payment.aggregate({
+            where: {
+                status: "SUCCESS",
+                paidAt: { gte: todayStart, lt: tomorrowStart },
+            },
+            _sum: { amount: true },
+            _count: { id: true },
+        }),
         prisma.payment.count({
             where: {
                 status: "SUCCESS",
@@ -211,6 +288,13 @@ export const getAdminStats = async () => {
         }),
         prisma.technicianProfile.count({ where: { verified: false } }),
     ]);
+
+    const totalSales = totalSalesAgg._sum.amount || 0;
+    const todaySales = todaySalesAgg._sum.amount || 0;
+    const adminRevenueTotal = Math.round(totalSales * ADMIN_REVENUE_RATE);
+    const adminRevenueToday = Math.round(todaySales * ADMIN_REVENUE_RATE);
+    const technicianShareTotal = totalSales - adminRevenueTotal;
+    const technicianShareToday = todaySales - adminRevenueToday;
 
     return {
         users: {
@@ -224,13 +308,141 @@ export const getAdminStats = async () => {
             cancelled: cancelledBookings,
             declined: declinedBookings,
         },
+        sales: {
+            /** Gross successful customer payments (all time) */
+            totalSales,
+            totalSalesCount: totalSalesAgg._count.id,
+            /** Gross successful payments paid today */
+            todaySales,
+            todaySalesCount: todaySalesAgg._count.id,
+            /** Platform keeps 40% of each successful payment */
+            adminRevenueRate: ADMIN_REVENUE_RATE,
+            adminRevenueTotal,
+            adminRevenueToday,
+            /** Technician share 60% */
+            technicianShareTotal,
+            technicianShareToday,
+        },
+        /** @deprecated use sales.* — kept for older clients */
         revenue: {
-            totalBdt: revenueAgg._sum.amount || 0,
-            successfulPayments: revenueAgg._count.id,
+            totalBdt: totalSales,
+            successfulPayments: totalSalesAgg._count.id,
+            adminRevenueBdt: adminRevenueTotal,
+            adminRevenueRate: ADMIN_REVENUE_RATE,
         },
         disputes: {
             cancelledPaidJobs: pendingRefunds,
             unverifiedTechnicians,
+        },
+    };
+};
+
+const ADMIN_REVENUE_RATE = 0.4;
+
+/** Paginated successful payments with admin 40% cut per row */
+export const getAdminSales = async (query: AdminSalesQuery) => {
+    const { page, limit, from, to, today } = query;
+    const skip = (page - 1) * limit;
+
+    let paidAtFilter: { gte?: Date; lt?: Date } | undefined;
+
+    if (today) {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const tomorrowStart = new Date(todayStart);
+        tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+        paidAtFilter = { gte: todayStart, lt: tomorrowStart };
+    } else if (from || to) {
+        paidAtFilter = {
+            ...(from && { gte: new Date(from) }),
+            ...(to && { lt: new Date(to) }),
+        };
+    }
+
+    const where = {
+        status: "SUCCESS" as const,
+        ...(paidAtFilter && { paidAt: paidAtFilter }),
+    };
+
+    const [payments, total, salesAgg] = await Promise.all([
+        prisma.payment.findMany({
+            where,
+            select: {
+                id: true,
+                amount: true,
+                method: true,
+                status: true,
+                providerTxnId: true,
+                paidAt: true,
+                createdAt: true,
+                booking: {
+                    select: {
+                        id: true,
+                        refCode: true,
+                        status: true,
+                        service: {
+                            select: {
+                                id: true,
+                                title: true,
+                            },
+                        },
+                        customer: {
+                            select: {
+                                id: true,
+                                name: true,
+                                email: true,
+                            },
+                        },
+                        technician: {
+                            select: {
+                                id: true,
+                                trade: true,
+                                user: {
+                                    select: {
+                                        id: true,
+                                        name: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            skip,
+            take: limit,
+            orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
+        }),
+        prisma.payment.count({ where }),
+        prisma.payment.aggregate({
+            where,
+            _sum: { amount: true },
+        }),
+    ]);
+
+    const totalSales = salesAgg._sum.amount || 0;
+
+    return {
+        payments: payments.map((payment) => {
+            const adminRevenue = Math.round(payment.amount * ADMIN_REVENUE_RATE);
+            return {
+                ...payment,
+                adminRevenue,
+                technicianEarning: payment.amount - adminRevenue,
+                adminRevenueRate: ADMIN_REVENUE_RATE,
+            };
+        }),
+        summary: {
+            totalSales,
+            adminRevenueTotal: Math.round(totalSales * ADMIN_REVENUE_RATE),
+            technicianShareTotal:
+                totalSales - Math.round(totalSales * ADMIN_REVENUE_RATE),
+            adminRevenueRate: ADMIN_REVENUE_RATE,
+        },
+        meta: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit) || 0,
         },
     };
 };

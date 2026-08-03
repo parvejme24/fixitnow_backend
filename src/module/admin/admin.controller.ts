@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { catchAsync } from "../../utils/catchAsync.js";
 import {
     adminBookingQuerySchema,
+    adminSalesQuerySchema,
     adminUserQuerySchema,
     updateUserStatusSchema,
 } from "./admin.interface.js";
@@ -50,5 +51,17 @@ export const getStats = catchAsync(async (req: Request, res: Response) => {
     res.status(200).json({
         success: true,
         data: stats,
+    });
+});
+
+export const getSales = catchAsync(async (req: Request, res: Response) => {
+    const query = adminSalesQuerySchema.parse(req.query);
+    const result = await adminService.getAdminSales(query);
+
+    res.status(200).json({
+        success: true,
+        meta: result.meta,
+        summary: result.summary,
+        data: result.payments,
     });
 });

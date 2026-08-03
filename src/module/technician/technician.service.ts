@@ -39,6 +39,8 @@ const technicianListSelect = {
             id: true,
             name: true,
             phone: true,
+            profileImage: true,
+            initials: true,
         },
     },
     categories: {
@@ -63,6 +65,8 @@ const profileSelect = {
             name: true,
             email: true,
             phone: true,
+            profileImage: true,
+            initials: true,
         },
     },
 } satisfies Prisma.TechnicianProfileSelect;
