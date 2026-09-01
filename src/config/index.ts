@@ -1,4 +1,4 @@
-const DEFAULT_FRONTEND_URL = "https://fixitnow-frontend-weld.vercel.app";
+const DEFAULT_FRONTEND_URL = "https://fixitnow-pvj.vercel.app";
 
 const vercelUrl = process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}`
@@ -10,6 +10,8 @@ const backendUrl =
 const corsOrigins = [
     process.env.APP_URL || DEFAULT_FRONTEND_URL,
     DEFAULT_FRONTEND_URL,
+    "https://fixitnow-frontend-weld.vercel.app",
+    "https://fixitnow-pvj.vercel.app",
     "http://localhost:3000",
     "http://localhost:5173",
     backendUrl,
